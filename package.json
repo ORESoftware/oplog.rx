@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/ORESoftware/oplog.rx#readme",
   "dependencies": {
+    "json-stdio": "0.0.1015",
     "mongodb": "^3.0.4",
     "rxjs": "^5.5.7"
   },

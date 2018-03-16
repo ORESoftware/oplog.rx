@@ -1,6 +1,6 @@
-const {OplogObservable} = require('oplog.rx');
+const {ObservableOplog} = require('oplog.rx');
 
-const oplog = new OplogObservable();
+const oplog = new ObservableOplog();
 
 oplog.tail().then(function () {
   console.log('tailing');
@@ -9,25 +9,28 @@ oplog.tail().then(function () {
   console.error(err);
 });
 
+const events = oplog.getEvents();
 
-oplog.events.delete.subscribe(v => {
-  console.log('delete happened.')
+events.delete.filter(v => {
+  return true;
+})
+.subscribe(v => {
+  // console.log('delete happened.')
 });
 
-
-oplog.events.insert.subscribe(v => {
-  console.log('insert happened.')
+events.insert.subscribe(v => {
+  // console.log('insert happened.')
 });
 
-
-oplog.events.update.subscribe(v => {
-   console.log('update happened.')
+events.update.subscribe(v => {
+  // console.log('update happened.')
 });
 
+const strm = oplog.getReadableStream({events: ['delete']});
 
-
-const strm = oplog.getReadableStream();
-
-strm.on('data',function (d) {
+strm.on('data', function (d) {
   console.log(String(d));
 });
+
+
+oplog.getRawStream().pipe(process.stdout);

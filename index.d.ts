@@ -1,18 +1,32 @@
 /// <reference types="node" />
-import { Readable } from "stream";
+import { Readable, Transform } from "stream";
 import { Subject } from "rxjs";
 export interface OplogObservableOpts {
     uri: string;
     url: string;
     collName: string;
 }
+export interface OplogStrmFilter {
+    events?: Array<'update' | 'insert' | 'delete'>;
+    namespace?: string;
+    ns?: string;
+}
 export declare const regex: (pattern: string) => RegExp;
-export declare class OplogObservable {
+export interface ReadableStrmWithFilter {
+    strm: Readable;
+    filter: Partial<OplogStrmFilter>;
+}
+export declare class ObservableOplog {
     private uri;
     private coll;
     collName: string;
     isTailing: boolean;
-    events: {
+    private events;
+    private transformStreams;
+    private changeStream;
+    private readableStreams;
+    constructor(opts: OplogObservableOpts, mongoOpts: any);
+    getEvents(): {
         all: Subject<any>;
         update: Subject<Object>;
         insert: Subject<Object>;
@@ -20,14 +34,15 @@ export declare class OplogObservable {
         errors: Subject<Object>;
         end: Subject<Object>;
     };
-    private readableStream;
-    constructor(opts: OplogObservableOpts, mongoOpts: any);
     connect(): Promise<void>;
     private getTime();
     private getStream();
-    getReadableStream(): Readable;
-    tail(): Promise<void> | Promise<boolean>;
-    stop(): void;
+    private getTransformStream2();
+    private getTransformStream();
+    getRawStream(): Transform;
+    getReadableStream(filter?: Partial<OplogStrmFilter>): Readable;
+    tail(): Promise<any>;
+    stop(): Promise<any>;
     close(): void;
 }
-export declare const create: (opts: OplogObservableOpts, mongoOpts: any) => OplogObservable;
+export declare const create: (opts: OplogObservableOpts, mongoOpts: any) => ObservableOplog;

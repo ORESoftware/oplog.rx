@@ -1,10 +1,12 @@
 'use strict';
 
-import {Readable} from "stream";
-import {Collection, MongoClient, ServerOptions} from 'mongodb';
+import assert = require('assert');
+import {Readable, Transform} from "stream";
+import {ChangeStream, Collection, FindOneOptions, MongoClient, ServerOptions} from 'mongodb';
 import {ReplaySubject, Subject} from "rxjs";
 import {Timestamp} from "bson";
 const MONGO_URI = 'mongodb://127.0.0.1:27017/local';
+import * as JSONStdio from 'json-stdio';
 
 export interface OplogObservableOpts {
   uri: string,
@@ -12,26 +14,49 @@ export interface OplogObservableOpts {
   collName: string;
 }
 
+export interface OplogStrmFilter {
+  events?: Array<'update' | 'insert' | 'delete'>
+  namespace?: string,
+  ns?: string
+}
+
+// *Open A Change Stream*
+// You can only open a change stream against replica sets or sharded clusters.
+// For a sharded cluster, you must issue the open change stream operation against the mongos.
+// https://docs.mongodb.com/manual/changeStreams/
+
 export const regex = function (pattern: string) {
   pattern = pattern || '*';
   pattern = pattern.replace(/[*]/g, '(.*?)');
   return new RegExp(`^${pattern}$`, 'i')
 };
 
-const events = {
+interface EventsSignature {
+  [key: string]: string,
+  i: 'insert',
+  u: 'update',
+  d: 'delete'
+}
+
+const evs = <EventsSignature>{
   i: 'insert',
   u: 'update',
   d: 'delete'
 };
 
-export class OplogObservable {
+export interface ReadableStrmWithFilter {
+  strm: Readable,
+  filter: Partial<OplogStrmFilter>
+}
+
+export class ObservableOplog {
   
   private uri: string;
   private coll: Collection;
   collName: string;
   isTailing = false;
   
-  events = {
+  private events = {
     all: new Subject<any>(),
     update: new Subject<Object>(),
     insert: new Subject<Object>(),
@@ -40,8 +65,11 @@ export class OplogObservable {
     end: new Subject<Object>()
   };
   
-  // private internalEvs: Array<string> = [];
-  private readableStream: Readable;
+  
+  private transformStreams : Array<Transform> = [];
+  private changeStream: ChangeStream;
+  
+  private readableStreams: ReadableStrmWithFilter[] = [];
   
   constructor(opts: OplogObservableOpts, mongoOpts: any) {
     
@@ -50,18 +78,10 @@ export class OplogObservable {
     
     const self = this;
     
-    // this.readableStream = new Readable({
-    //   read(size) {
-    //     return true;
-    //   }
-    // });
+  }
   
-    this.readableStream = new Readable({
-      read(size) {
-        return true;
-      }
-    });
-    
+  getEvents() {
+    return this.events;
   }
   
   connect() {
@@ -81,7 +101,6 @@ export class OplogObservable {
       return Promise.resolve((typeof ts !== 'number') ? ts : new Timestamp(0, ts));
     }
     
-    debugger;
     const q = coll.findOne({}, {ts: 1});
     
     return q.then(function (doc) {
@@ -90,7 +109,7 @@ export class OplogObservable {
     
   }
   
-  private getStream() {
+  private getStream(): Promise<ChangeStream> {
     
     const query = {}, coll = this.coll, ns = this.ns;
     
@@ -98,11 +117,14 @@ export class OplogObservable {
       query.ns = {$regex: regex(ns)};
     }
     
+    const self = this;
+    
     return this.getTime().then(function (t) {
       
       query.ts = {$gt: t};
       
       const q = coll.find(query, {
+        // raw: true,
         tailable: true,
         awaitData: true,
         oplogReplay: true,
@@ -110,18 +132,65 @@ export class OplogObservable {
         numberOfRetries: Number.MAX_VALUE
       });
       
-      debugger;
-      
-      return q.stream();
+      return self.changeStream = q.stream();
     });
     
   }
   
-  getReadableStream() {
-    return this.readableStream;
+  private getTransformStream2() {
+    const t = JSONStdio.createParser();
+    this.transformStreams.push(t);
+    return t;
   }
   
-  tail() {
+  private getTransformStream(){
+    const t = new Transform({
+      objectMode: true,
+      readableObjectMode: true,
+      writableObjectMode: true,
+      transform(chunk, encoding, cb) {
+        this.push(chunk);
+        cb();
+      },
+      flush(cb) {
+        cb();
+      }
+    });
+  
+    this.transformStreams.push(t);
+    return t;
+  }
+  
+  getRawStream() {
+    const t = this.getTransformStream();
+    if(this.changeStream){
+      return this.changeStream.pipe(t);
+    }
+    return t;
+  }
+  
+  getReadableStream(filter?: Partial<OplogStrmFilter>) {
+    
+    if (filter) {
+      if (filter.events) {
+        assert(Array.isArray(filter.events), 'filter.events must be an array');
+        filter.events.forEach(function (v) {
+          assert(v)
+        });
+      }
+    }
+    
+    const readableStream = new Readable({
+      read(size) {
+        return false;
+      }
+    });
+    
+    this.readableStreams.push({filter: filter || {}, strm: readableStream});
+    return readableStream;
+  }
+  
+  tail(): Promise<any> {
     
     if (this.isTailing) {
       return Promise.resolve(true);
@@ -130,8 +199,12 @@ export class OplogObservable {
     this.isTailing = true;
     
     const self = this;
-    const readable = this.readableStream;
-    return this.connect().then(function () {
+    
+    return this.connect()
+    .then(function () {
+      return self.stop();  // if we are already tailing, then stop
+    })
+    .then(function () {
       return self.getStream();
     })
     .catch(function (err) {
@@ -140,17 +213,34 @@ export class OplogObservable {
     })
     .then(function (s) {
       
-      s.once('end', function (v) {
-        self.events.all.next({type: 'end', value: true});
-        self.events.end.next(true);
+      self.transformStreams.forEach(function(t){
+          console.log('piping to transform stream');
+          s.pipe(t);
       });
       
-      s.on('data', function (v: any, x: any) {
+      s.once('end', function (v: any) {
+        self.events.all.next({type: 'end', value: v || true});
+        self.events.end.next(true);
+        self.readableStreams.forEach(function (r) {
+          return r.strm.push(null);
+        });
+      });
+      
+      s.on('data', function (v: any) {
         
-        debugger;
+        const type = evs[v.op];
         
-        const type = events[v.op] as 'update' | 'insert' | 'delete';
-        self.readableStream.push(JSON.stringify(v) + '\n');
+        self.readableStreams.forEach(function (r) {
+          
+          if (!r.filter.events || r.filter.events.length < 1) {
+            return r.strm.push(JSON.stringify(v) + '\n');
+          }
+          
+          if (r.filter.events.includes(type as any)) {
+            return r.strm.push(JSON.stringify(v) + '\n');
+          }
+          
+        });
         
         if (!type) {
           // console.error('op type not recognized:', type, 'data:', v);
@@ -159,9 +249,10 @@ export class OplogObservable {
         }
         
         self.events[type].next(v);
+        
       });
       
-      s.on('error', function (e) {
+      s.on('error', function (e: Error) {
         self.events.all.next({type: 'error', value: e});
         self.events.errors.next(e);
       });
@@ -170,8 +261,22 @@ export class OplogObservable {
     
   }
   
-  stop() {
+  stop(): Promise<any> {
+    
+    if (!this.changeStream) {
+      return Promise.resolve(null);
+    }
   
+    let t;
+    while(t = this.transformStreams.pop()){
+      t.end();
+      t.destroy();
+    }
+    
+    const self = this;
+    return this.changeStream.close().then(function () {
+      return self.changeStream.destroy();
+    });
   }
   
   close() {
@@ -181,5 +286,5 @@ export class OplogObservable {
 }
 
 export const create = function (opts: OplogObservableOpts, mongoOpts: any) {
-  return new OplogObservable(opts, mongoOpts);
+  return new ObservableOplog(opts, mongoOpts);
 };
