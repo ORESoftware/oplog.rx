@@ -1,12 +1,20 @@
 'use strict';
 
 import assert = require('assert');
-import {Readable, Transform} from "stream";
+import {Readable, Stream, Transform} from "stream";
 import {ChangeStream, Collection, FindOneOptions, MongoClient, ServerOptions} from 'mongodb';
 import {ReplaySubject, Subject} from "rxjs";
 import {Timestamp} from "bson";
 const MONGO_URI = 'mongodb://127.0.0.1:27017/local';
 import * as JSONStdio from 'json-stdio';
+const FilterTransform = require('./filter-strm');
+import {FilterStream} from './filter-strm';
+import EventEmitter = require('events');
+
+const log = {
+  info: console.log.bind(console, '[oplog.rx]'),
+  error: console.error.bind(console, '[oplog.rx]'),
+};
 
 export interface OplogObservableOpts {
   uri: string,
@@ -49,6 +57,65 @@ export interface ReadableStrmWithFilter {
   filter: Partial<OplogStrmFilter>
 }
 
+export interface OplogInterpreterOpts {
+  useEmitter: boolean,
+  useObservers: boolean
+}
+
+export interface OplogInterpreter {
+  ops?: {
+    all: Subject<any>,
+    update: Subject<Object>,
+    insert: Subject<Object>,
+    delete: Subject<Object>,
+    errors: Subject<Object>,
+    end: Subject<Object>
+  },
+  emitter?: EventEmitter
+}
+
+export const getOplogStreamInterpreter = function (s: Stream, opts?: OplogInterpreterOpts) : OplogInterpreter {
+  
+  opts = opts || {useEmitter: true, useObservers: true};
+  
+  const ret = {
+    ops: opts.useObservers && {
+      all: new Subject<any>(),
+      update: new Subject<Object>(),
+      insert: new Subject<Object>(),
+      delete: new Subject<Object>(),
+      errors: new Subject<Object>(),
+      end: new Subject<Object>(),
+    },
+    emitter: opts.useEmitter && new EventEmitter()
+  };
+  
+  s.on('error', function (e) {
+    ret.emitter.emit('error', e);
+    ret.ops.errors.next(e);
+  });
+  
+  s.on('data', function (v) {
+    
+    if (!v) {
+      log.error('Unexpected error: empty changeStream event data [2].');
+      return;
+    }
+    
+    ret.ops.all.next(v);
+    
+    const type = evs[v.op];
+    
+    if (type) {
+      ret.emitter.emit(type, v);
+      ret.ops[type].next(v);
+    }
+    
+  });
+  
+  return ret;
+};
+
 export class ObservableOplog {
   
   private uri: string;
@@ -56,7 +123,7 @@ export class ObservableOplog {
   collName: string;
   isTailing = false;
   
-  private events = {
+  private ops = {
     all: new Subject<any>(),
     update: new Subject<Object>(),
     insert: new Subject<Object>(),
@@ -65,23 +132,25 @@ export class ObservableOplog {
     end: new Subject<Object>()
   };
   
+  private mongoOpts: any;
   
-  private transformStreams : Array<Transform> = [];
-  private changeStream: ChangeStream;
+  private transformStreams: Array<Transform> = [];
+  private rawStream: ChangeStream;
   
   private readableStreams: ReadableStrmWithFilter[] = [];
   
-  constructor(opts: OplogObservableOpts, mongoOpts: any) {
-    
+  constructor(opts?: OplogObservableOpts, mongoOpts?: any) {
     opts = opts || {} as any;
     this.uri = opts.uri || MONGO_URI;
-    
-    const self = this;
-    
+    this.mongoOpts = mongoOpts || {};
   }
   
   getEvents() {
-    return this.events;
+    return this.ops;
+  }
+  
+  getOps() {
+    return this.ops;
   }
   
   connect() {
@@ -132,18 +201,13 @@ export class ObservableOplog {
         numberOfRetries: Number.MAX_VALUE
       });
       
-      return self.changeStream = q.stream();
+      return self.rawStream = q.stream();
     });
     
   }
   
-  private getTransformStream2() {
-    const t = JSONStdio.createParser();
-    this.transformStreams.push(t);
-    return t;
-  }
-  
-  private getTransformStream(){
+  getFilteredStream(opts: OplogStrmFilter) {
+    
     const t = new Transform({
       objectMode: true,
       readableObjectMode: true,
@@ -156,17 +220,16 @@ export class ObservableOplog {
         cb();
       }
     });
-  
+    
     this.transformStreams.push(t);
     return t;
   }
   
   getRawStream() {
-    const t = this.getTransformStream();
-    if(this.changeStream){
-      return this.changeStream.pipe(t);
+    if (this.rawStream) {
+      return this.rawStream;
     }
-    return t;
+    throw new Error('You need to await the result of tail(), before requesting access to raw stream.')
   }
   
   getReadableStream(filter?: Partial<OplogStrmFilter>) {
@@ -213,14 +276,14 @@ export class ObservableOplog {
     })
     .then(function (s) {
       
-      self.transformStreams.forEach(function(t){
-          console.log('piping to transform stream');
-          s.pipe(t);
-      });
-      
       s.once('end', function (v: any) {
-        self.events.all.next({type: 'end', value: v || true});
-        self.events.end.next(true);
+        self.ops.all.next({type: 'end', value: v || true});
+        self.ops.end.next(true);
+        
+        self.transformStreams.forEach(function (t) {
+          t.write(null);
+        });
+        
         self.readableStreams.forEach(function (r) {
           return r.strm.push(null);
         });
@@ -228,7 +291,16 @@ export class ObservableOplog {
       
       s.on('data', function (v: any) {
         
+        if (!v) {
+          log.error('Unexpected error: empty changeStream event data [1].');
+          return;
+        }
+        
         const type = evs[v.op];
+        
+        self.transformStreams.forEach(function (t) {
+          t.write(v);
+        });
         
         self.readableStreams.forEach(function (r) {
           
@@ -239,22 +311,20 @@ export class ObservableOplog {
           if (r.filter.events.includes(type as any)) {
             return r.strm.push(JSON.stringify(v) + '\n');
           }
-          
         });
         
         if (!type) {
-          // console.error('op type not recognized:', type, 'data:', v);
-          self.events.all.next({type: 'unknown', value: v});
+          self.ops.all.next({type: 'unknown', value: v});
           return;
         }
         
-        self.events[type].next(v);
+        self.ops[type].next(v);
         
       });
       
       s.on('error', function (e: Error) {
-        self.events.all.next({type: 'error', value: e});
-        self.events.errors.next(e);
+        self.ops.all.next({type: 'error', value: e});
+        self.ops.errors.next(e);
       });
       
     });
@@ -263,19 +333,19 @@ export class ObservableOplog {
   
   stop(): Promise<any> {
     
-    if (!this.changeStream) {
+    if (!this.rawStream) {
       return Promise.resolve(null);
     }
-  
+    
     let t;
-    while(t = this.transformStreams.pop()){
+    while (t = this.transformStreams.pop()) {
       t.end();
       t.destroy();
     }
     
     const self = this;
-    return this.changeStream.close().then(function () {
-      return self.changeStream.destroy();
+    return this.rawStream.close().then(function () {
+      return self.rawStream.destroy();
     });
   }
   

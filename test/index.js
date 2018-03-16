@@ -1,4 +1,5 @@
 const {ObservableOplog} = require('oplog.rx');
+const {transformObject2JSON} = require('json-stdio');
 
 const oplog = new ObservableOplog();
 
@@ -26,11 +27,22 @@ events.update.subscribe(v => {
   // console.log('update happened.')
 });
 
-const strm = oplog.getReadableStream({events: ['delete']});
+// const strm = oplog.getReadableStream({events: ['delete']});
 
-strm.on('data', function (d) {
-  console.log(String(d));
+// strm.on('data', function (d) {
+//   console.log(String(d));
+// });
+
+
+oplog.getRawStream().pipe(transformObject2JSON()).on('data', function(v){
+  console.log('all done and well?:', v);
 });
 
+setTimeout(function(){
+  oplog.stop();
+},3000);
 
-oplog.getRawStream().pipe(process.stdout);
+// oplog.getRawStream().on('data', function (v) {
+//    console.log('here we go:', v);
+// });
+
