@@ -39,6 +39,7 @@ export declare class ObservableOplog {
     private coll;
     collName: string;
     isTailing: boolean;
+    private emitter;
     private ops;
     private mongoOpts;
     private transformStreams;
@@ -61,6 +62,7 @@ export declare class ObservableOplog {
         errors: Subject<Object>;
         end: Subject<Object>;
     };
+    getEmitter(): EventEmitter;
     connect(): Promise<void>;
     private getTime();
     private getStream();

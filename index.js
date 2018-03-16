@@ -56,6 +56,7 @@ exports.getOplogStreamInterpreter = function (s, opts) {
 var ObservableOplog = (function () {
     function ObservableOplog(opts, mongoOpts) {
         this.isTailing = false;
+        this.emitter = new EventEmitter();
         this.ops = {
             all: new rxjs_1.Subject(),
             update: new rxjs_1.Subject(),
@@ -75,6 +76,9 @@ var ObservableOplog = (function () {
     };
     ObservableOplog.prototype.getOps = function () {
         return this.ops;
+    };
+    ObservableOplog.prototype.getEmitter = function () {
+        return this.emitter;
     };
     ObservableOplog.prototype.connect = function () {
         var self = this;
@@ -200,6 +204,7 @@ var ObservableOplog = (function () {
                     self.ops.all.next({ type: 'unknown', value: v });
                     return;
                 }
+                self.emitter.emit(type, v);
                 self.ops[type].next(v);
             });
             s.on('error', function (e) {

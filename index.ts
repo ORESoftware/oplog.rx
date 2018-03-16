@@ -74,7 +74,7 @@ export interface OplogInterpreter {
   emitter?: EventEmitter
 }
 
-export const getOplogStreamInterpreter = function (s: Stream, opts?: OplogInterpreterOpts) : OplogInterpreter {
+export const getOplogStreamInterpreter = function (s: Stream, opts?: OplogInterpreterOpts): OplogInterpreter {
   
   opts = opts || {useEmitter: true, useObservers: true};
   
@@ -122,6 +122,7 @@ export class ObservableOplog {
   private coll: Collection;
   collName: string;
   isTailing = false;
+  private emitter = new EventEmitter();
   
   private ops = {
     all: new Subject<any>(),
@@ -133,10 +134,8 @@ export class ObservableOplog {
   };
   
   private mongoOpts: any;
-  
   private transformStreams: Array<Transform> = [];
   private rawStream: ChangeStream;
-  
   private readableStreams: ReadableStrmWithFilter[] = [];
   
   constructor(opts?: OplogObservableOpts, mongoOpts?: any) {
@@ -151,6 +150,10 @@ export class ObservableOplog {
   
   getOps() {
     return this.ops;
+  }
+  
+  getEmitter(){
+    return this.emitter;
   }
   
   connect() {
@@ -318,6 +321,7 @@ export class ObservableOplog {
           return;
         }
         
+        self.emitter.emit(type, v);
         self.ops[type].next(v);
         
       });
