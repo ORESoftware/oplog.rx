@@ -1,0 +1,28 @@
+{
+  "name": "oplog.rx",
+  "version": "0.0.101",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "suman test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/oplog.rx.git"
+  },
+  "keywords": [
+    "oplog",
+    "mongodb",
+    "rx",
+    "rxjs"
+  ],
+  "author": "Olegzandr V.D.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/oplog.rx/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/oplog.rx#readme",
+  "dependencies": {
+    "mongodb": "^3.0.4"
+  }
+}
