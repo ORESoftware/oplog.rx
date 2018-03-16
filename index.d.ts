@@ -71,6 +71,6 @@ export declare class ObservableOplog {
     getReadableStream(filter?: Partial<OplogStrmFilter>): Readable;
     tail(): Promise<any>;
     stop(): Promise<any>;
-    close(): void;
+    close(): Promise<any>;
 }
 export declare const create: (opts: OplogObservableOpts, mongoOpts: any) => ObservableOplog;

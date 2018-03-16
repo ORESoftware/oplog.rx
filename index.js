@@ -5,9 +5,8 @@ var stream_1 = require("stream");
 var mongodb_1 = require("mongodb");
 var rxjs_1 = require("rxjs");
 var bson_1 = require("bson");
-var MONGO_URI = 'mongodb://127.0.0.1:27017/local';
-var FilterTransform = require('./filter-strm');
 var EventEmitter = require("events");
+var MONGO_URI = 'mongodb://127.0.0.1:27017/local';
 var log = {
     info: console.log.bind(console, '[oplog.rx]'),
     error: console.error.bind(console, '[oplog.rx]'),
@@ -228,6 +227,7 @@ var ObservableOplog = (function () {
         });
     };
     ObservableOplog.prototype.close = function () {
+        return this.stop();
     };
     return ObservableOplog;
 }());

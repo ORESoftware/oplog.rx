@@ -2,14 +2,11 @@
 
 import assert = require('assert');
 import {Readable, Stream, Transform} from "stream";
-import {ChangeStream, Collection, FindOneOptions, MongoClient, ServerOptions} from 'mongodb';
-import {ReplaySubject, Subject} from "rxjs";
+import {ChangeStream, Collection, MongoClient} from 'mongodb';
+import { Subject} from "rxjs";
 import {Timestamp} from "bson";
-const MONGO_URI = 'mongodb://127.0.0.1:27017/local';
-import * as JSONStdio from 'json-stdio';
-const FilterTransform = require('./filter-strm');
-import {FilterStream} from './filter-strm';
 import EventEmitter = require('events');
+const MONGO_URI = 'mongodb://127.0.0.1:27017/local';
 
 const log = {
   info: console.log.bind(console, '[oplog.rx]'),
@@ -354,7 +351,7 @@ export class ObservableOplog {
   }
   
   close() {
-  
+    return this.stop();
   }
   
 }
