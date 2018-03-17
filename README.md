@@ -13,6 +13,29 @@
  This library will switch to native Observables once they become available.
  Until then, simply using the latest version of RxJS.
  
+ 
+ ### How the Oplog works
+ 
+ The MongoDB oplog is simply a capped collection that is tailable, using Cursor.stream();
+ The structure of an Oplog document is like so:
+ 
+ ```json
+ {"ts":"6533791416483577857","t":4,"h":"8859258976700926266","v":2,"op":"i","ns":"test.foo","o":{"_id":"5ab94bb","username":"fox"}}
+```
+
+> ts => 64bit timestamp
+> op => the type of operation (i is insert, u is update, d is delete, etc.)
+> ns => namespace => <db>.<collection>
+> o => the document that changed (it should always be the complete document, not just the changed part).
+> t =>  the election "term" of the replicaset (not really important)
+> v => Version of the oplog format (unfortunately not the version of the document object)
+> h => The hash field gives each oplog entry a unique id
+
+
+This article is pretty good on the subject:
+https://engineering.tes.com/post/mongodb-oplog/
+ 
+ 
  ### Basic Usage
  
  ```js
@@ -38,8 +61,44 @@ oplog.getEmitter()
 
 ```
 
+### Useful Query/Filter options
 
-### Advanced Usage with Observables
+```js
+import {ObservableOplog} from 'oplog.rx';
+import {Timestamp} from 'bson';
+
+const oplog = new ObservableOplog({
+  ts: Timestamp.fromInt(Date.now() - 45000),  // search for documents that are younger than 45 seconds ago
+  ns: {
+    $in: ['mydb.coll1', 'mydb.coll2', /mydb2\.*/],
+  }
+});
+
+// or if you need something very custom use query:
+
+const oplog = new ObservableOplog({
+  query: {
+    ts: {
+      $gt: Timestamp.fromInt(Date.now() - 45000)
+    }, 
+    $and: [
+      {ns: {$nin: [/foo/, /rolo/]}},
+      {ns: {$in: [/bar/]}},
+    ]
+  }
+});
+
+// if the query parameter is provided, it will be sent directly to:
+
+const coll = db.collection('oplog.rs');
+const cursor = coll.find(query);
+
+
+```
+
+
+
+###  Usage with Observables
 
 Oplog.Rx is designed to support Observables and Node.js streams 
 
@@ -67,7 +126,7 @@ Oplog.Rx is designed to support Observables and Node.js streams
 ```
 
 
-### Advanced Usage with Node.js Streams
+### Usage with Node.js Streams
 
 Oplog.Rx is designed to support Observables and Node.js streams 
 

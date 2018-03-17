@@ -75,6 +75,9 @@ var ObservableOplog = (function () {
         this.transformStreams = [];
         this.readableStreams = [];
         opts = opts || {};
+        if (opts.query && (opts.ts || opts.namespace || opts.ns || opts.timestamp)) {
+            throw new Error('if the "query" option is supplied, then "ns", "timestamp", "namespace", and "ts" are redundant.');
+        }
         if (opts.ts && opts.timestamp) {
             throw new Error('Cannot use both "timestamp" and "ts" options - pick one.');
         }
@@ -162,6 +165,15 @@ var ObservableOplog = (function () {
                 { op: { $ne: 'c' } }
             ]
         };
+        if (this.query) {
+            if (this.query.$and) {
+                assert(Array.isArray(this.query.$and), 'Your $and clause in your query is not an array.');
+                this.query.$and = this.query.$and.concat(query.$and);
+            }
+            else {
+                this.query.$and = query.$and.slice(0);
+            }
+        }
         var coll = this.coll;
         var ns = this.ns;
         if (ns) {
@@ -170,7 +182,7 @@ var ObservableOplog = (function () {
         var self = this;
         return this.getTime().then(function (t) {
             query.ts = { $gt: t };
-            var q = coll.find(query)
+            var q = coll.find(self.query || query)
                 .addCursorFlag('tailable', true)
                 .addCursorFlag('awaitData', true)
                 .addCursorFlag('noCursorTimeout', true)

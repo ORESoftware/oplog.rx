@@ -16,6 +16,7 @@ export declare type ObservableOplogTimestamp = {
 } | Timestamp;
 export declare type OplogNamespace = string | object | RegExp;
 export interface OplogObservableOpts {
+    query: object;
     ts?: ObservableOplogTimestamp;
     timestamp?: ObservableOplogTimestamp;
     uri?: string;
@@ -49,6 +50,7 @@ export declare class ObservableOplog {
     private emitter;
     private client;
     private ns;
+    private query;
     private ops;
     private rawCursor;
     private mongoOpts;

@@ -27,10 +27,10 @@ export type ObservableOplogTimestamp =
   { low: number, high: number } |
   Timestamp;
 
-
 export type OplogNamespace = string | object | RegExp;
 
 export interface OplogObservableOpts {
+  query: object,
   ts?: ObservableOplogTimestamp,
   timestamp?: ObservableOplogTimestamp,
   uri?: string,
@@ -85,6 +85,7 @@ export class ObservableOplog {
   private emitter = new EventEmitter();
   private client: MongoClient;
   private ns: OplogNamespace;
+  private query: any;
   
   private ops = {
     all: new Subject<any>(),
@@ -104,6 +105,10 @@ export class ObservableOplog {
   constructor(opts?: OplogObservableOpts, mongoOpts?: any) {
     opts = opts || {} as any;
     
+    if (opts.query && (opts.ts || opts.namespace || opts.ns || opts.timestamp)) {
+      throw new Error('if the "query" option is supplied, then "ns", "timestamp", "namespace", and "ts" are redundant.');
+    }
+    
     if (opts.ts && opts.timestamp) {
       throw new Error('Cannot use both "timestamp" and "ts" options - pick one.');
     }
@@ -117,7 +122,6 @@ export class ObservableOplog {
     this.ns = opts.ns || opts.namespace;
     this.mongoOpts = mongoOpts || {};
   }
-  
   
   getOps() {
     return this.ops;
@@ -214,6 +218,16 @@ export class ObservableOplog {
       ]
     };
     
+    if (this.query) {
+      if (this.query.$and) {
+        assert(Array.isArray(this.query.$and), 'Your $and clause in your query is not an array.');
+        this.query.$and = this.query.$and.concat(query.$and);
+      }
+      else {
+        this.query.$and = query.$and.slice(0);
+      }
+    }
+    
     const coll = this.coll;
     const ns = this.ns;
     
@@ -238,7 +252,7 @@ export class ObservableOplog {
       
       // const q2 = coll.find(query).addOption();
       
-      const q = coll.find(query)
+      const q = coll.find(self.query || query)
       .addCursorFlag('tailable', true)
       .addCursorFlag('awaitData', true)  // true or false?
       .addCursorFlag('noCursorTimeout', true)
@@ -333,7 +347,7 @@ export class ObservableOplog {
       s.on('error', function (e: Error) {
         self.handleOplogError(e);
       });
-  
+      
       cb && cb();
       
     });
@@ -364,7 +378,7 @@ export class ObservableOplog {
     const self = this;
     return this.rawStream.close().then(function () {
       self.isTailing = false;
-      !isLog &&  log.info('successfully stopped tailing the oplog.');
+      !isLog && log.info('successfully stopped tailing the oplog.');
       return self.rawStream.destroy();
     });
   }
