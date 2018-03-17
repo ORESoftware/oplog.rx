@@ -73,8 +73,15 @@ var ObservableOplog = (function () {
         this.transformStreams = [];
         this.readableStreams = [];
         opts = opts || {};
-        this.ts = opts.ts;
+        if (opts.ts && opts.timestamp) {
+            throw new Error('Cannot use both "timestamp" and "ts" options - pick one.');
+        }
+        if (opts.ns && opts.namespace) {
+            throw new Error('Cannot use both "namespace" and "ns" options - pick one.');
+        }
+        this.ts = opts.ts || opts.timestamp;
         this.uri = opts.uri || MONGO_URI;
+        this.ns = opts.ns || opts.namespace;
         this.mongoOpts = mongoOpts || {};
     }
     ObservableOplog.prototype.getEvents = function () {
@@ -88,9 +95,16 @@ var ObservableOplog = (function () {
     };
     ObservableOplog.prototype.connect = function () {
         var self = this;
+        debugger;
+        if (this.client && this.client.isConnected('xxx')) {
+            log.info('MongoClient was already connected.');
+            return Promise.resolve(null);
+        }
         return mongodb_1.MongoClient.connect(this.uri).then(function (client) {
             var db = client.db('local');
+            self.client = client;
             self.coll = db.collection('oplog.rs');
+            return null;
         });
     };
     ObservableOplog.prototype.handleOplogError = function (e) {
@@ -157,13 +171,14 @@ var ObservableOplog = (function () {
         var self = this;
         return this.getTime().then(function (t) {
             query.ts = { $gt: t };
-            var q = coll.find(query, {
-                tailable: true,
-                awaitData: true,
-                oplogReplay: true,
-                noCursorTimeout: true,
-                numberOfRetries: Number.MAX_VALUE
-            });
+            var q = coll.find(query)
+                .addCursorFlag('tailable', true)
+                .addCursorFlag('awaitData', true)
+                .addCursorFlag('noCursorTimeout', true)
+                .addCursorFlag('oplogReplay', true)
+                .setCursorOption('numberOfRetries', Number.MAX_VALUE)
+                .setCursorOption('tailableRetryInterval', 200);
+            self.rawCursor = q;
             return self.rawStream = q.stream();
         });
     };
@@ -214,7 +229,7 @@ var ObservableOplog = (function () {
         var self = this;
         return this.connect()
             .then(function () {
-            return self.stop();
+            return self.stop(true);
         })
             .then(function () {
             return self.getStream();
@@ -225,7 +240,6 @@ var ObservableOplog = (function () {
             return Promise.reject(err);
         })
             .then(function (s) {
-            cb && cb();
             s.once('end', function (v) {
                 self.handleOplogEnd(v);
             });
@@ -235,24 +249,27 @@ var ObservableOplog = (function () {
             s.on('error', function (e) {
                 self.handleOplogError(e);
             });
+            cb && cb();
         });
     };
-    ObservableOplog.prototype.stop = function () {
+    ObservableOplog.prototype.stop = function (isLog) {
         if (!this.rawStream) {
+            !isLog && log.error('stop() called on a oplog instance that probably had not been initialized (was not already tailing).');
             return Promise.resolve(null);
         }
+        !isLog && log.info('stop() called on oplog instance.');
         var t;
         while (t = this.transformStreams.pop()) {
-            t.push(null);
             t.end();
             t.destroy();
         }
         while (t = this.readableStreams.pop()) {
-            t.strm.push(null);
             t.strm.destroy();
         }
         var self = this;
         return this.rawStream.close().then(function () {
+            self.isTailing = false;
+            !isLog && log.info('successfully stopped tailing the oplog.');
             return self.rawStream.destroy();
         });
     };

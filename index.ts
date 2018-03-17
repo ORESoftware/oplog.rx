@@ -2,7 +2,7 @@
 
 import assert = require('assert');
 import {Readable, Stream, Transform} from "stream";
-import {ChangeStream, Collection, MongoClient, ObjectId} from 'mongodb';
+import {ChangeStream, Collection, Cursor, MongoClient, ObjectId} from 'mongodb';
 import {Subject} from "rxjs";
 import {Timestamp} from "bson";
 import EventEmitter = require('events');
@@ -14,6 +14,12 @@ const log = {
   info: console.log.bind(console, '[oplog.rx]'),
   error: console.error.bind(console, '[oplog.rx]'),
 };
+
+interface OplogQuery {
+  ns?: any,
+  ts?: any,
+  $and: Array<any>
+}
 
 export type ObservableOplogTimestamp =
   { $timestamp: string } |
@@ -27,6 +33,8 @@ export interface OplogObservableOpts {
   uri?: string,
   url?: string,
   collName?: string;
+  ns?: string;
+  namespace?: string;
 }
 
 export interface OplogStrmFilter {
@@ -71,6 +79,8 @@ export class ObservableOplog {
   collName: string;
   isTailing = false;
   private emitter = new EventEmitter();
+  private client: MongoClient;
+  private ns: string;
   
   private ops = {
     all: new Subject<any>(),
@@ -81,6 +91,7 @@ export class ObservableOplog {
     end: new Subject<Object>()
   };
   
+  private rawCursor: Cursor;
   private mongoOpts: any;
   private transformStreams: Array<Transform> = [];
   private rawStream: ChangeStream;
@@ -88,8 +99,18 @@ export class ObservableOplog {
   
   constructor(opts?: OplogObservableOpts, mongoOpts?: any) {
     opts = opts || {} as any;
-    this.ts = opts.ts;
+    
+    if (opts.ts && opts.timestamp) {
+      throw new Error('Cannot use both "timestamp" and "ts" options - pick one.');
+    }
+    
+    if (opts.ns && opts.namespace) {
+      throw new Error('Cannot use both "namespace" and "ns" options - pick one.');
+    }
+    
+    this.ts = opts.ts || opts.timestamp;
     this.uri = opts.uri || MONGO_URI;
+    this.ns = opts.ns || opts.namespace;
     this.mongoOpts = mongoOpts || {};
   }
   
@@ -105,12 +126,22 @@ export class ObservableOplog {
     return this.emitter;
   }
   
-  connect() {
+  connect(): Promise<null> {
     const self = this;
+    
+    debugger;
+    
+    if (this.client && this.client.isConnected('xxx')) {
+      log.info('MongoClient was already connected.');
+      return Promise.resolve(null);
+    }
+    
     return MongoClient.connect(this.uri).then(function (client) {
       const db = client.db('local');
       // db.oplog.rs.find()
+      self.client = client;
       self.coll = db.collection('oplog.rs');
+      return null;
     });
   }
   
@@ -174,8 +205,10 @@ export class ObservableOplog {
   
   private getStream(): Promise<ChangeStream> {
     
-    const query = {
+    const query = <OplogQuery> {
       // we don't want op to be either n or c
+      // ts: undefined as any,
+      // ns: undefined as any,
       $and: [
         {op: {$ne: 'n'}},
         {op: {$ne: 'c'}}
@@ -195,15 +228,26 @@ export class ObservableOplog {
       
       query.ts = {$gt: t};
       
-      const q = coll.find(query, {
-        // raw: true,
-        tailable: true,
-        awaitData: true,
-        oplogReplay: true,
-        noCursorTimeout: true,
-        numberOfRetries: Number.MAX_VALUE
-      });
+      // const q = coll.find(query, {
+      //   // raw: true,
+      //   tailable: true,
+      //   awaitData: true,
+      //   oplogReplay: true,
+      //   noCursorTimeout: true,
+      //   numberOfRetries: Number.MAX_VALUE
+      // });
       
+      // const q2 = coll.find(query).addOption();
+      
+      const q = coll.find(query)
+      .addCursorFlag('tailable', true)
+      .addCursorFlag('awaitData', true)  // true or false?
+      .addCursorFlag('noCursorTimeout', true)
+      .addCursorFlag('oplogReplay', true)
+      .setCursorOption('numberOfRetries', Number.MAX_VALUE)
+      .setCursorOption('tailableRetryInterval', 200);
+      
+      self.rawCursor = q;
       return self.rawStream = q.stream();
     });
     
@@ -267,7 +311,7 @@ export class ObservableOplog {
     
     return this.connect()
     .then(function () {
-      return self.stop();  // if we are already tailing, then stop
+      return self.stop(true);  // if we are already tailing, then stop
     })
     .then(function () {
       return self.getStream();
@@ -278,8 +322,6 @@ export class ObservableOplog {
       return Promise.reject(err);
     })
     .then(function (s) {
-      
-      cb && cb();
       
       s.once('end', function (v: any) {
         self.handleOplogEnd(v);
@@ -292,31 +334,38 @@ export class ObservableOplog {
       s.on('error', function (e: Error) {
         self.handleOplogError(e);
       });
+  
+      cb && cb();
       
     });
     
   }
   
-  stop(): Promise<any> {
+  stop(isLog?: boolean): Promise<any> {
     
     if (!this.rawStream) {
+      !isLog && log.error('stop() called on a oplog instance that probably had not been initialized (was not already tailing).');
       return Promise.resolve(null);
     }
     
+    !isLog && log.info('stop() called on oplog instance.');
+    
     let t;
     while (t = this.transformStreams.pop()) {
-      t.push(null);
+      // t.push(null);
       t.end();
       t.destroy();
     }
     
     while (t = this.readableStreams.pop()) {
-      t.strm.push(null);
+      // t.strm.push(null);
       t.strm.destroy();
     }
     
     const self = this;
     return this.rawStream.close().then(function () {
+      self.isTailing = false;
+      !isLog &&  log.info('successfully stopped tailing the oplog.');
       return self.rawStream.destroy();
     });
   }

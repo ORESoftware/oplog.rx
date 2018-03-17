@@ -20,6 +20,8 @@ export interface OplogObservableOpts {
     uri?: string;
     url?: string;
     collName?: string;
+    ns?: string;
+    namespace?: string;
 }
 export interface OplogStrmFilter {
     events?: Array<'update' | 'insert' | 'delete'>;
@@ -43,7 +45,10 @@ export declare class ObservableOplog {
     collName: string;
     isTailing: boolean;
     private emitter;
+    private client;
+    private ns;
     private ops;
+    private rawCursor;
     private mongoOpts;
     private transformStreams;
     private rawStream;
@@ -66,7 +71,7 @@ export declare class ObservableOplog {
         end: Subject<Object>;
     };
     getEmitter(): EventEmitter;
-    connect(): Promise<void>;
+    connect(): Promise<null>;
     private handleOplogError(e);
     private handleOplogEnd(v);
     private handleOplogData(v);
@@ -76,7 +81,7 @@ export declare class ObservableOplog {
     getRawStream(): ChangeStream;
     getReadableStream(filter?: Partial<OplogStrmFilter>): Readable;
     tail(cb?: ErrorFirstCB): Promise<any>;
-    stop(): Promise<any>;
+    stop(isLog?: boolean): Promise<any>;
     close(): Promise<any>;
 }
 export declare const create: (opts: OplogObservableOpts, mongoOpts: any) => ObservableOplog;

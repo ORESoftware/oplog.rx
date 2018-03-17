@@ -36,7 +36,7 @@ export const getValidTimestamp = function (ts: any, coll: Collection) : Timestam
     throw new Error('"ts" field needs to be an instance of Timestamp.');
   }
   
-  log.info('using timestamp instance representing the current time.');
+  log.info('using internal timestamp instance representing the current time.');
   return new Timestamp(1, Math.ceil(Date.now() / 1000));
   
   // return Promise.resolve(new Timestamp(0,));
