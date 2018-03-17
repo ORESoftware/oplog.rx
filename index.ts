@@ -3,10 +3,12 @@
 import assert = require('assert');
 import {Readable, Stream, Transform} from "stream";
 import {ChangeStream, Collection, MongoClient} from 'mongodb';
-import { Subject} from "rxjs";
+import {Subject} from "rxjs";
 import {Timestamp} from "bson";
 import EventEmitter = require('events');
 const MONGO_URI = 'mongodb://127.0.0.1:27017/local';
+import helpers = require('./lib/helper');
+import {OplogInterpreter, OplogInterpreterOpts, ReadableStrmWithFilter} from "./lib/interfaces";
 
 const log = {
   info: console.log.bind(console, '[oplog.rx]'),
@@ -25,6 +27,8 @@ export interface OplogStrmFilter {
   ns?: string
 }
 
+export {getOplogStreamInterpreter} from './lib/helper';
+
 // *Open A Change Stream*
 // You can only open a change stream against replica sets or sharded clusters.
 // For a sharded cluster, you must issue the open change stream operation against the mongos.
@@ -36,82 +40,20 @@ export const regex = function (pattern: string) {
   return new RegExp(`^${pattern}$`, 'i')
 };
 
-interface EventsSignature {
+export interface EventsSignature {
   [key: string]: string,
   i: 'insert',
   u: 'update',
   d: 'delete'
 }
 
-const evs = <EventsSignature>{
+export const evs = <EventsSignature>{
   i: 'insert',
   u: 'update',
   d: 'delete'
 };
 
-export interface ReadableStrmWithFilter {
-  strm: Readable,
-  filter: Partial<OplogStrmFilter>
-}
-
-export interface OplogInterpreterOpts {
-  useEmitter: boolean,
-  useObservers: boolean
-}
-
-export interface OplogInterpreter {
-  ops?: {
-    all: Subject<any>,
-    update: Subject<Object>,
-    insert: Subject<Object>,
-    delete: Subject<Object>,
-    errors: Subject<Object>,
-    end: Subject<Object>
-  },
-  emitter?: EventEmitter
-}
-
-export const getOplogStreamInterpreter = function (s: Stream, opts?: OplogInterpreterOpts): OplogInterpreter {
-  
-  opts = opts || {useEmitter: true, useObservers: true};
-  
-  const ret = {
-    ops: opts.useObservers && {
-      all: new Subject<any>(),
-      update: new Subject<Object>(),
-      insert: new Subject<Object>(),
-      delete: new Subject<Object>(),
-      errors: new Subject<Object>(),
-      end: new Subject<Object>(),
-    },
-    emitter: opts.useEmitter && new EventEmitter()
-  };
-  
-  s.on('error', function (e) {
-    ret.emitter.emit('error', e);
-    ret.ops.errors.next(e);
-  });
-  
-  s.on('data', function (v) {
-    
-    if (!v) {
-      log.error('Unexpected error: empty changeStream event data [2].');
-      return;
-    }
-    
-    ret.ops.all.next(v);
-    
-    const type = evs[v.op];
-    
-    if (type) {
-      ret.emitter.emit(type, v);
-      ret.ops[type].next(v);
-    }
-    
-  });
-  
-  return ret;
-};
+export type ErrorFirstCB = (err?: Error) => void;
 
 export class ObservableOplog {
   
@@ -149,7 +91,7 @@ export class ObservableOplog {
     return this.ops;
   }
   
-  getEmitter(){
+  getEmitter() {
     return this.emitter;
   }
   
@@ -157,21 +99,79 @@ export class ObservableOplog {
     const self = this;
     return MongoClient.connect(this.uri).then(function (client) {
       const db = client.db('local');
+      // db.oplog.rs.find()
       self.coll = db.collection('oplog.rs');
     });
   }
   
-  private getTime(): Promise<Timestamp> {
+  private handleOplogError(e: Error) {
+    this.ops.all.next({type: 'error', value: e});
+    this.ops.errors.next(e);
+  }
+  
+  private handleOplogEnd(v: any) {
+    this.ops.all.next({type: 'end', value: v || true});
+    this.ops.end.next(true);
+    
+    this.transformStreams.forEach(function (t) {
+      t.write(null);
+    });
+    
+    this.readableStreams.forEach(function (r) {
+      return r.strm.push(null);
+    });
+  };
+  
+  private handleOplogData(v: Object) {
+    
+    if (!v) {
+      log.error('Unexpected error: empty changeStream event data [1].');
+      return;
+    }
+    
+    const type = evs[v.op];
+    
+    this.transformStreams.forEach(function (t) {
+      t.write(v);
+    });
+    
+    this.readableStreams.forEach(function (r) {
+      
+      if (!r.filter.events || r.filter.events.length < 1) {
+        return r.strm.push(JSON.stringify(v) + '\n');
+      }
+      
+      if (r.filter.events.includes(type as any)) {
+        return r.strm.push(JSON.stringify(v) + '\n');
+      }
+    });
+    
+    if (!type) {
+      this.ops.all.next({type: 'unknown', value: v});
+      return;
+    }
+    
+    this.emitter.emit(type, v);
+    this.ops[type].next(v);
+  }
+  
+  private getTime(): Promise<Timestamp | Date> {
     
     const ts = this.ts;
     const coll = this.coll;
     
+    
+    // return Promise.resolve(new Date());
+    
+    // return Promise.resolve(new Timestamp(0,));
+    
     if (ts) {
+      throw new Error('whoops');
       return Promise.resolve((typeof ts !== 'number') ? ts : new Timestamp(0, ts));
     }
     
     const q = coll.findOne({}, {ts: 1});
-    
+
     return q.then(function (doc) {
       return doc ? doc.ts : new Timestamp(0, (Date.now() / 1000 | 0))
     });
@@ -180,7 +180,16 @@ export class ObservableOplog {
   
   private getStream(): Promise<ChangeStream> {
     
-    const query = {}, coll = this.coll, ns = this.ns;
+    const query = {
+      // we don't want op to be either n or c
+      $and: [
+        {op: {$ne: 'n'}},
+        {op: {$ne: 'c'}}
+      ]
+    };
+    
+    const coll = this.coll;
+    const ns = this.ns;
     
     if (ns) {
       query.ns = {$regex: regex(ns)};
@@ -253,14 +262,13 @@ export class ObservableOplog {
     return readableStream;
   }
   
-  tail(): Promise<any> {
+  tail(cb?: ErrorFirstCB): Promise<any> | void {
     
     if (this.isTailing) {
       return Promise.resolve(true);
     }
     
     this.isTailing = true;
-    
     const self = this;
     
     return this.connect()
@@ -272,60 +280,23 @@ export class ObservableOplog {
     })
     .catch(function (err) {
       self.isTailing = false;
+      cb && cb(err);
       return Promise.reject(err);
     })
     .then(function (s) {
       
+      cb && cb();
+      
       s.once('end', function (v: any) {
-        self.ops.all.next({type: 'end', value: v || true});
-        self.ops.end.next(true);
-        
-        self.transformStreams.forEach(function (t) {
-          t.write(null);
-        });
-        
-        self.readableStreams.forEach(function (r) {
-          return r.strm.push(null);
-        });
+        self.handleOplogEnd(v);
       });
       
       s.on('data', function (v: any) {
-        
-        if (!v) {
-          log.error('Unexpected error: empty changeStream event data [1].');
-          return;
-        }
-        
-        const type = evs[v.op];
-        
-        self.transformStreams.forEach(function (t) {
-          t.write(v);
-        });
-        
-        self.readableStreams.forEach(function (r) {
-          
-          if (!r.filter.events || r.filter.events.length < 1) {
-            return r.strm.push(JSON.stringify(v) + '\n');
-          }
-          
-          if (r.filter.events.includes(type as any)) {
-            return r.strm.push(JSON.stringify(v) + '\n');
-          }
-        });
-        
-        if (!type) {
-          self.ops.all.next({type: 'unknown', value: v});
-          return;
-        }
-        
-        self.emitter.emit(type, v);
-        self.ops[type].next(v);
-        
+        self.handleOplogData(v);
       });
       
       s.on('error', function (e: Error) {
-        self.ops.all.next({type: 'error', value: e});
-        self.ops.errors.next(e);
+        self.handleOplogError(e);
       });
       
     });
@@ -340,8 +311,14 @@ export class ObservableOplog {
     
     let t;
     while (t = this.transformStreams.pop()) {
+      t.push(null);
       t.end();
       t.destroy();
+    }
+    
+    while (t = this.readableStreams.pop()) {
+      t.strm.push(null);
+      t.strm.destroy();
     }
     
     const self = this;

@@ -11,46 +11,17 @@ var log = {
     info: console.log.bind(console, '[oplog.rx]'),
     error: console.error.bind(console, '[oplog.rx]'),
 };
+var helper_1 = require("./lib/helper");
+exports.getOplogStreamInterpreter = helper_1.getOplogStreamInterpreter;
 exports.regex = function (pattern) {
     pattern = pattern || '*';
     pattern = pattern.replace(/[*]/g, '(.*?)');
     return new RegExp("^" + pattern + "$", 'i');
 };
-var evs = {
+exports.evs = {
     i: 'insert',
     u: 'update',
     d: 'delete'
-};
-exports.getOplogStreamInterpreter = function (s, opts) {
-    opts = opts || { useEmitter: true, useObservers: true };
-    var ret = {
-        ops: opts.useObservers && {
-            all: new rxjs_1.Subject(),
-            update: new rxjs_1.Subject(),
-            insert: new rxjs_1.Subject(),
-            delete: new rxjs_1.Subject(),
-            errors: new rxjs_1.Subject(),
-            end: new rxjs_1.Subject(),
-        },
-        emitter: opts.useEmitter && new EventEmitter()
-    };
-    s.on('error', function (e) {
-        ret.emitter.emit('error', e);
-        ret.ops.errors.next(e);
-    });
-    s.on('data', function (v) {
-        if (!v) {
-            log.error('Unexpected error: empty changeStream event data [2].');
-            return;
-        }
-        ret.ops.all.next(v);
-        var type = evs[v.op];
-        if (type) {
-            ret.emitter.emit(type, v);
-            ret.ops[type].next(v);
-        }
-    });
-    return ret;
 };
 var ObservableOplog = (function () {
     function ObservableOplog(opts, mongoOpts) {
@@ -86,10 +57,50 @@ var ObservableOplog = (function () {
             self.coll = db.collection('oplog.rs');
         });
     };
+    ObservableOplog.prototype.handleOplogError = function (e) {
+        this.ops.all.next({ type: 'error', value: e });
+        this.ops.errors.next(e);
+    };
+    ObservableOplog.prototype.handleOplogEnd = function (v) {
+        this.ops.all.next({ type: 'end', value: v || true });
+        this.ops.end.next(true);
+        this.transformStreams.forEach(function (t) {
+            t.write(null);
+        });
+        this.readableStreams.forEach(function (r) {
+            return r.strm.push(null);
+        });
+    };
+    ;
+    ObservableOplog.prototype.handleOplogData = function (v) {
+        if (!v) {
+            log.error('Unexpected error: empty changeStream event data [1].');
+            return;
+        }
+        var type = exports.evs[v.op];
+        this.transformStreams.forEach(function (t) {
+            t.write(v);
+        });
+        this.readableStreams.forEach(function (r) {
+            if (!r.filter.events || r.filter.events.length < 1) {
+                return r.strm.push(JSON.stringify(v) + '\n');
+            }
+            if (r.filter.events.includes(type)) {
+                return r.strm.push(JSON.stringify(v) + '\n');
+            }
+        });
+        if (!type) {
+            this.ops.all.next({ type: 'unknown', value: v });
+            return;
+        }
+        this.emitter.emit(type, v);
+        this.ops[type].next(v);
+    };
     ObservableOplog.prototype.getTime = function () {
         var ts = this.ts;
         var coll = this.coll;
         if (ts) {
+            throw new Error('whoops');
             return Promise.resolve((typeof ts !== 'number') ? ts : new bson_1.Timestamp(0, ts));
         }
         var q = coll.findOne({}, { ts: 1 });
@@ -98,7 +109,14 @@ var ObservableOplog = (function () {
         });
     };
     ObservableOplog.prototype.getStream = function () {
-        var query = {}, coll = this.coll, ns = this.ns;
+        var query = {
+            $and: [
+                { op: { $ne: 'n' } },
+                { op: { $ne: 'c' } }
+            ]
+        };
+        var coll = this.coll;
+        var ns = this.ns;
         if (ns) {
             query.ns = { $regex: exports.regex(ns) };
         }
@@ -154,7 +172,7 @@ var ObservableOplog = (function () {
         this.readableStreams.push({ filter: filter || {}, strm: readableStream });
         return readableStream;
     };
-    ObservableOplog.prototype.tail = function () {
+    ObservableOplog.prototype.tail = function (cb) {
         if (this.isTailing) {
             return Promise.resolve(true);
         }
@@ -169,46 +187,19 @@ var ObservableOplog = (function () {
         })
             .catch(function (err) {
             self.isTailing = false;
+            cb && cb(err);
             return Promise.reject(err);
         })
             .then(function (s) {
+            cb && cb();
             s.once('end', function (v) {
-                self.ops.all.next({ type: 'end', value: v || true });
-                self.ops.end.next(true);
-                self.transformStreams.forEach(function (t) {
-                    t.write(null);
-                });
-                self.readableStreams.forEach(function (r) {
-                    return r.strm.push(null);
-                });
+                self.handleOplogEnd(v);
             });
             s.on('data', function (v) {
-                if (!v) {
-                    log.error('Unexpected error: empty changeStream event data [1].');
-                    return;
-                }
-                var type = evs[v.op];
-                self.transformStreams.forEach(function (t) {
-                    t.write(v);
-                });
-                self.readableStreams.forEach(function (r) {
-                    if (!r.filter.events || r.filter.events.length < 1) {
-                        return r.strm.push(JSON.stringify(v) + '\n');
-                    }
-                    if (r.filter.events.includes(type)) {
-                        return r.strm.push(JSON.stringify(v) + '\n');
-                    }
-                });
-                if (!type) {
-                    self.ops.all.next({ type: 'unknown', value: v });
-                    return;
-                }
-                self.emitter.emit(type, v);
-                self.ops[type].next(v);
+                self.handleOplogData(v);
             });
             s.on('error', function (e) {
-                self.ops.all.next({ type: 'error', value: e });
-                self.ops.errors.next(e);
+                self.handleOplogError(e);
             });
         });
     };
@@ -218,8 +209,13 @@ var ObservableOplog = (function () {
         }
         var t;
         while (t = this.transformStreams.pop()) {
+            t.push(null);
             t.end();
             t.destroy();
+        }
+        while (t = this.readableStreams.pop()) {
+            t.strm.push(null);
+            t.strm.destroy();
         }
         var self = this;
         return this.rawStream.close().then(function () {

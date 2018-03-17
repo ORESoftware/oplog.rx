@@ -1,5 +1,5 @@
 {
-  "linkToItself": false,
+  "linkToItself": true,
   "searchRoots": [
     "$HOME/WebstormProjects/oresoftware"
   ],

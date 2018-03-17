@@ -1,48 +1,22 @@
-const {ObservableOplog} = require('oplog.rx');
-const {transformObject2JSON} = require('json-stdio');
-
-const oplog = new ObservableOplog();
-
+var ObservableOplog = require('oplog.rx').ObservableOplog;
+var transformObject2JSON = require('json-stdio').transformObject2JSON;
+var oplog = new ObservableOplog();
 oplog.tail().then(function () {
-  console.log('tailing');
+    console.log('tailing');
 })
-.catch(function (err) {
-  console.error(err);
+    .catch(function (err) {
+    console.error(err);
 });
-
-const events = oplog.getEvents();
-
-events.delete.filter(v => {
-  return true;
+var events = oplog.getEvents();
+events.delete.filter(function (v) {
+    return true;
 })
-.subscribe(v => {
-  // console.log('delete happened.')
+    .subscribe(function (v) {
 });
-
-events.insert.subscribe(v => {
-  // console.log('insert happened.')
+events.insert.subscribe(function (v) {
 });
-
-events.update.subscribe(v => {
-  // console.log('update happened.')
+events.update.subscribe(function (v) {
 });
-
-// const strm = oplog.getReadableStream({events: ['delete']});
-
-// strm.on('data', function (d) {
-//   console.log(String(d));
-// });
-
-
-oplog.getRawStream().pipe(transformObject2JSON()).on('data', function(v){
-  console.log('all done and well?:', v);
+oplog.getFilteredStream({}).pipe(transformObject2JSON()).on('data', function (v) {
+    console.log('all done and well?:', v);
 });
-
-setTimeout(function(){
-  oplog.stop();
-},3000);
-
-// oplog.getRawStream().on('data', function (v) {
-//    console.log('here we go:', v);
-// });
-
