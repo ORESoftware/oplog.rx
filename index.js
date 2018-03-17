@@ -48,6 +48,8 @@ var log = {
 };
 var helper_1 = require("./lib/helper");
 exports.getOplogStreamInterpreter = helper_1.getOplogStreamInterpreter;
+var helper_2 = require("./lib/helper");
+exports.oplogStreamInterpreter = helper_2.getOplogStreamInterpreter;
 exports.regex = function (pattern) {
     pattern = pattern || '*';
     pattern = pattern.replace(/[*]/g, '(.*?)');
@@ -84,9 +86,6 @@ var ObservableOplog = (function () {
         this.ns = opts.ns || opts.namespace;
         this.mongoOpts = mongoOpts || {};
     }
-    ObservableOplog.prototype.getEvents = function () {
-        return this.ops;
-    };
     ObservableOplog.prototype.getOps = function () {
         return this.ops;
     };

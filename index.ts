@@ -27,13 +27,16 @@ export type ObservableOplogTimestamp =
   { low: number, high: number } |
   Timestamp;
 
+
+export type OplogNamespace = string | object | RegExp;
+
 export interface OplogObservableOpts {
   ts?: ObservableOplogTimestamp,
   timestamp?: ObservableOplogTimestamp,
   uri?: string,
   url?: string,
   collName?: string;
-  ns?: string | object | RegExp;
+  ns?: OplogNamespace;
   namespace?: string;
 }
 
@@ -44,6 +47,7 @@ export interface OplogStrmFilter {
 }
 
 export {getOplogStreamInterpreter} from './lib/helper';
+export {getOplogStreamInterpreter as oplogStreamInterpreter} from './lib/helper';
 
 // *Open A Change Stream*
 // You can only open a change stream against replica sets or sharded clusters.
@@ -80,7 +84,7 @@ export class ObservableOplog {
   isTailing = false;
   private emitter = new EventEmitter();
   private client: MongoClient;
-  private ns: string;
+  private ns: OplogNamespace;
   
   private ops = {
     all: new Subject<any>(),
@@ -114,9 +118,6 @@ export class ObservableOplog {
     this.mongoOpts = mongoOpts || {};
   }
   
-  getEvents() {
-    return this.ops;
-  }
   
   getOps() {
     return this.ops;

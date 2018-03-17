@@ -12,7 +12,7 @@ oplog.tail().then(function () {
   console.error(err);
 });
 
-const evs = oplog.getEvents();
+const evs = oplog.getOps();
 
 evs.delete.filter(v => {
   return true;

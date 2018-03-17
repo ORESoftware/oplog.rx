@@ -29,10 +29,7 @@ oplog.tail().then(function () {
 
 
 
-
-
-
-const ev = oplog.getEvents();
+const ev = oplog.getOps();
 
 ev.delete.filter(v => {
   return true;

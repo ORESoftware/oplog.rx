@@ -14,13 +14,14 @@ export declare type ObservableOplogTimestamp = {
     low: number;
     high: number;
 } | Timestamp;
+export declare type OplogNamespace = string | object | RegExp;
 export interface OplogObservableOpts {
     ts?: ObservableOplogTimestamp;
     timestamp?: ObservableOplogTimestamp;
     uri?: string;
     url?: string;
     collName?: string;
-    ns?: string | object | RegExp;
+    ns?: OplogNamespace;
     namespace?: string;
 }
 export interface OplogStrmFilter {
@@ -29,6 +30,7 @@ export interface OplogStrmFilter {
     ns?: string;
 }
 export { getOplogStreamInterpreter } from './lib/helper';
+export { getOplogStreamInterpreter as oplogStreamInterpreter } from './lib/helper';
 export declare const regex: (pattern: string) => RegExp;
 export interface EventsSignature {
     [key: string]: string;
@@ -54,14 +56,6 @@ export declare class ObservableOplog {
     private rawStream;
     private readableStreams;
     constructor(opts?: OplogObservableOpts, mongoOpts?: any);
-    getEvents(): {
-        all: Subject<any>;
-        update: Subject<Object>;
-        insert: Subject<Object>;
-        delete: Subject<Object>;
-        errors: Subject<Object>;
-        end: Subject<Object>;
-    };
     getOps(): {
         all: Subject<any>;
         update: Subject<Object>;

@@ -23,7 +23,7 @@ oplog.tail().then(function () {
     .catch(function (err) {
     console.error(err);
 });
-var ev = oplog.getEvents();
+var ev = oplog.getOps();
 ev.delete.filter(function (v) {
     return true;
 })
