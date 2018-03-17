@@ -33,7 +33,7 @@ export interface OplogObservableOpts {
   uri?: string,
   url?: string,
   collName?: string;
-  ns?: string;
+  ns?: string | object | RegExp;
   namespace?: string;
 }
 
@@ -207,8 +207,6 @@ export class ObservableOplog {
     
     const query = <OplogQuery> {
       // we don't want op to be either n or c
-      // ts: undefined as any,
-      // ns: undefined as any,
       $and: [
         {op: {$ne: 'n'}},
         {op: {$ne: 'c'}}
@@ -219,7 +217,7 @@ export class ObservableOplog {
     const ns = this.ns;
     
     if (ns) {
-      query.ns = {$regex: regex(ns)};
+      query.ns = ns;
     }
     
     const self = this;

@@ -3,7 +3,15 @@
 import {ObservableOplog} from 'oplog.rx';
 import {transformObject2JSON} from 'json-stdio';
 
-const oplog = new ObservableOplog({ts: {_bsontype: 'Timestamp', low_: 1, high_: 1521257592}});
+const oplog = new ObservableOplog({
+  ts: {low: 1, high: 1521257592},
+  ns: {
+    $in: [
+      /test.foo$/,
+      /test.foo1$/
+    ]
+  }
+});
 
 oplog.tail().then(function () {
   console.log('tailing');
@@ -38,6 +46,7 @@ evs.update.subscribe(v => {
 let count = 0;
 oplog.getFilteredStream({}).pipe(transformObject2JSON()).on('data', function (v) {
   console.log('all done and well?:', count++);
+  console.log('zoom:::', v);
 });
 
 // setTimeout(function(){

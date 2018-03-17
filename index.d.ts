@@ -20,7 +20,7 @@ export interface OplogObservableOpts {
     uri?: string;
     url?: string;
     collName?: string;
-    ns?: string;
+    ns?: string | object | RegExp;
     namespace?: string;
 }
 export interface OplogStrmFilter {

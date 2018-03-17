@@ -166,7 +166,7 @@ var ObservableOplog = (function () {
         var coll = this.coll;
         var ns = this.ns;
         if (ns) {
-            query.ns = { $regex: exports.regex(ns) };
+            query.ns = ns;
         }
         var self = this;
         return this.getTime().then(function (t) {
