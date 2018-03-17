@@ -39,9 +39,9 @@ var assert = require("assert");
 var stream_1 = require("stream");
 var mongodb_1 = require("mongodb");
 var rxjs_1 = require("rxjs");
-var bson_1 = require("bson");
 var EventEmitter = require("events");
 var MONGO_URI = 'mongodb://127.0.0.1:27017/local';
+var helpers = require("./lib/helper");
 var log = {
     info: console.log.bind(console, '[oplog.rx]'),
     error: console.error.bind(console, '[oplog.rx]'),
@@ -73,6 +73,7 @@ var ObservableOplog = (function () {
         this.transformStreams = [];
         this.readableStreams = [];
         opts = opts || {};
+        this.ts = opts.ts;
         this.uri = opts.uri || MONGO_URI;
         this.mongoOpts = mongoOpts || {};
     }
@@ -100,10 +101,10 @@ var ObservableOplog = (function () {
         this.ops.all.next({ type: 'end', value: v || true });
         this.ops.end.next(true);
         this.transformStreams.forEach(function (t) {
-            t.write(null);
+            t.end();
         });
         this.readableStreams.forEach(function (r) {
-            return r.strm.push(null);
+            r.strm.destroy();
         });
     };
     ;
@@ -137,16 +138,7 @@ var ObservableOplog = (function () {
             return __generator(this, function (_a) {
                 ts = this.ts;
                 coll = this.coll;
-                if (ts && ts instanceof bson_1.Timestamp) {
-                    return [2, ts];
-                }
-                else if (ts._bsontype === 'Timestamp' && typeof ts._low === 'number' && typeof ts.high_ === 'number') {
-                    return [2, ts];
-                }
-                else if (ts) {
-                    throw new Error('"ts" field needs to be an instance of Timestamp.');
-                }
-                return [2, new bson_1.Timestamp(1, Math.ceil(Date.now() / 1000))];
+                return [2, helpers.getValidTimestamp(ts, coll)];
             });
         });
     };
@@ -164,7 +156,6 @@ var ObservableOplog = (function () {
         }
         var self = this;
         return this.getTime().then(function (t) {
-            console.log('timestamp:', t);
             query.ts = { $gt: t };
             var q = coll.find(query, {
                 tailable: true,

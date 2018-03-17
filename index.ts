@@ -15,11 +15,18 @@ const log = {
   error: console.error.bind(console, '[oplog.rx]'),
 };
 
+export type ObservableOplogTimestamp =
+  { $timestamp: string } |
+  { _bsontype: 'Timestamp', low_: number, high_: number } |
+  { low: number, high: number } |
+  Timestamp;
+
 export interface OplogObservableOpts {
-  ts: Timestamp,
-  uri: string,
-  url: string,
-  collName: string;
+  ts?: ObservableOplogTimestamp,
+  timestamp?: ObservableOplogTimestamp,
+  uri?: string,
+  url?: string,
+  collName?: string;
 }
 
 export interface OplogStrmFilter {
@@ -58,6 +65,7 @@ export type ErrorFirstCB = (err?: Error) => void;
 
 export class ObservableOplog {
   
+  private ts: ObservableOplogTimestamp;
   private uri: string;
   private coll: Collection;
   collName: string;
@@ -80,6 +88,7 @@ export class ObservableOplog {
   
   constructor(opts?: OplogObservableOpts, mongoOpts?: any) {
     opts = opts || {} as any;
+    this.ts = opts.ts;
     this.uri = opts.uri || MONGO_URI;
     this.mongoOpts = mongoOpts || {};
   }
@@ -115,11 +124,11 @@ export class ObservableOplog {
     this.ops.end.next(true);
     
     this.transformStreams.forEach(function (t) {
-      t.write(null);
+      t.end();
     });
     
     this.readableStreams.forEach(function (r) {
-      return r.strm.push(null);
+      r.strm.destroy();
     });
   };
   
@@ -158,41 +167,9 @@ export class ObservableOplog {
   
   private async getTime(): Promise<Timestamp> {
     
-    const ts = this.ts;
+    const ts = this.ts as any;
     const coll = this.coll;
-    
-    if(ts && ts instanceof Timestamp){
-      return ts;
-    }
-    else if(ts._bsontype === 'Timestamp' && typeof ts._low === 'number' && typeof ts.high_ === 'number'){
-      return ts;
-    }
-    else if(ts){
-      throw new Error('"ts" field needs to be an instance of Timestamp.');
-    }
-    
-    return new Timestamp(1, Math.ceil(Date.now()/1000));
-    
-    // return Promise.resolve(new Timestamp(0,));
-    
-    // if (ts) {
-    //   throw new Error('whoops');
-    //   return Promise.resolve((typeof ts !== 'number') ? ts : new Timestamp(0, ts));
-    // }
-    //
-    // const q = coll.findOne({}, {ts: 1});
-    //
-    // return q.then(function (doc) {
-    //   return doc ? doc.ts : new Timestamp(0, (Date.now() / 1000 | 0))
-    // });
-    
-    // find the most recent document in the oplog
-    // const q = coll.findOne({}, { sort: { ts: -1 }, limit: 1 });
-    //
-    // return q.then(function (doc) {
-    //   return doc ? doc.ts : new Timestamp(1, Math.ceil(Date.now()/1000));
-    // });
-  
+    return helpers.getValidTimestamp(ts, coll);
   }
   
   private getStream(): Promise<ChangeStream> {
@@ -215,8 +192,6 @@ export class ObservableOplog {
     const self = this;
     
     return this.getTime().then(function (t) {
-      
-      console.log('timestamp:', t);
       
       query.ts = {$gt: t};
       
@@ -281,7 +256,7 @@ export class ObservableOplog {
     return readableStream;
   }
   
-  tail(cb?: ErrorFirstCB): Promise<any> | void {
+  tail(cb?: ErrorFirstCB): Promise<any> {
     
     if (this.isTailing) {
       return Promise.resolve(true);

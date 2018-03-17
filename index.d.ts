@@ -4,11 +4,22 @@ import { ChangeStream } from 'mongodb';
 import { Subject } from "rxjs";
 import { Timestamp } from "bson";
 import EventEmitter = require('events');
+export declare type ObservableOplogTimestamp = {
+    $timestamp: string;
+} | {
+    _bsontype: 'Timestamp';
+    low_: number;
+    high_: number;
+} | {
+    low: number;
+    high: number;
+} | Timestamp;
 export interface OplogObservableOpts {
-    ts: Timestamp;
-    uri: string;
-    url: string;
-    collName: string;
+    ts?: ObservableOplogTimestamp;
+    timestamp?: ObservableOplogTimestamp;
+    uri?: string;
+    url?: string;
+    collName?: string;
 }
 export interface OplogStrmFilter {
     events?: Array<'update' | 'insert' | 'delete'>;
@@ -26,6 +37,7 @@ export interface EventsSignature {
 export declare const evs: EventsSignature;
 export declare type ErrorFirstCB = (err?: Error) => void;
 export declare class ObservableOplog {
+    private ts;
     private uri;
     private coll;
     collName: string;
@@ -63,7 +75,7 @@ export declare class ObservableOplog {
     getFilteredStream(opts: OplogStrmFilter): Transform;
     getRawStream(): ChangeStream;
     getReadableStream(filter?: Partial<OplogStrmFilter>): Readable;
-    tail(cb?: ErrorFirstCB): Promise<any> | void;
+    tail(cb?: ErrorFirstCB): Promise<any>;
     stop(): Promise<any>;
     close(): Promise<any>;
 }

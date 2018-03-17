@@ -3,7 +3,7 @@
 import {ObservableOplog} from 'oplog.rx';
 import {transformObject2JSON} from 'json-stdio';
 
-const oplog = new ObservableOplog();
+const oplog = new ObservableOplog({ts: {$timestamp: '6533748325076697089'}});
 
 oplog.tail().then(function () {
   console.log('tailing');
@@ -12,20 +12,20 @@ oplog.tail().then(function () {
   console.error(err);
 });
 
-const ev = oplog.getEvents();
+const evs = oplog.getEvents();
 
-ev.delete.filter(v => {
+evs.delete.filter(v => {
   return true;
 })
 .subscribe(v => {
   // console.log('delete happened.')
 });
 
-ev.insert.subscribe(v => {
+evs.insert.subscribe(v => {
   // console.log('insert happened.')
 });
 
-ev.update.subscribe(v => {
+evs.update.subscribe(v => {
   // console.log('update happened.')
 });
 
