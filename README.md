@@ -27,7 +27,7 @@
 |-------|-----------|---------------------------------------------------------------------------------------------------|
 | ts    | =>        | 64bit timestamp                                                                                   |
 | op    | =>        | the type of operation (i is insert, u is update, d is delete, etc.)                               |
-| ns    | =>        | <db>.<collection>                                                                                 |
+| ns    | =>        | \<db\>.\<collection\>                                                                                 |
 | o     | =>        | the document that changed (it should always be the complete document, not just the changed part). |
 | t     | =>        | the election "term" of the replicaset (not really important)                                      |
 | v     | =>        | Version of the oplog format (unfortunately not the version of the document object)                |
