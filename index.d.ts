@@ -2,8 +2,10 @@
 import { Readable, Transform } from "stream";
 import { ChangeStream } from 'mongodb';
 import { Subject } from "rxjs";
+import { Timestamp } from "bson";
 import EventEmitter = require('events');
 export interface OplogObservableOpts {
+    ts: Timestamp;
     uri: string;
     url: string;
     collName: string;

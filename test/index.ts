@@ -34,8 +34,9 @@ events.update.subscribe(v => {
 // });
 
 
+let count = 0;
 oplog.getFilteredStream({}).pipe(transformObject2JSON()).on('data', function(v){
-  console.log('all done and well?:', v);
+  console.log('all done and well?:', count++);
 });
 
 // setTimeout(function(){

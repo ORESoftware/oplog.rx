@@ -2,7 +2,7 @@
 
 import assert = require('assert');
 import {Readable, Stream, Transform} from "stream";
-import {ChangeStream, Collection, MongoClient} from 'mongodb';
+import {ChangeStream, Collection, MongoClient, ObjectId} from 'mongodb';
 import {Subject} from "rxjs";
 import {Timestamp} from "bson";
 import EventEmitter = require('events');
@@ -16,6 +16,7 @@ const log = {
 };
 
 export interface OplogObservableOpts {
+  ts: Timestamp,
   uri: string,
   url: string,
   collName: string;
@@ -155,27 +156,43 @@ export class ObservableOplog {
     this.ops[type].next(v);
   }
   
-  private getTime(): Promise<Timestamp | Date> {
+  private async getTime(): Promise<Timestamp> {
     
     const ts = this.ts;
     const coll = this.coll;
     
+    if(ts && ts instanceof Timestamp){
+      return ts;
+    }
+    else if(ts._bsontype === 'Timestamp' && typeof ts._low === 'number' && typeof ts.high_ === 'number'){
+      return ts;
+    }
+    else if(ts){
+      throw new Error('"ts" field needs to be an instance of Timestamp.');
+    }
     
-    // return Promise.resolve(new Date());
+    return new Timestamp(1, Math.ceil(Date.now()/1000));
     
     // return Promise.resolve(new Timestamp(0,));
     
-    if (ts) {
-      throw new Error('whoops');
-      return Promise.resolve((typeof ts !== 'number') ? ts : new Timestamp(0, ts));
-    }
+    // if (ts) {
+    //   throw new Error('whoops');
+    //   return Promise.resolve((typeof ts !== 'number') ? ts : new Timestamp(0, ts));
+    // }
+    //
+    // const q = coll.findOne({}, {ts: 1});
+    //
+    // return q.then(function (doc) {
+    //   return doc ? doc.ts : new Timestamp(0, (Date.now() / 1000 | 0))
+    // });
     
-    const q = coll.findOne({}, {ts: 1});
-
-    return q.then(function (doc) {
-      return doc ? doc.ts : new Timestamp(0, (Date.now() / 1000 | 0))
-    });
-    
+    // find the most recent document in the oplog
+    // const q = coll.findOne({}, { sort: { ts: -1 }, limit: 1 });
+    //
+    // return q.then(function (doc) {
+    //   return doc ? doc.ts : new Timestamp(1, Math.ceil(Date.now()/1000));
+    // });
+  
   }
   
   private getStream(): Promise<ChangeStream> {
@@ -198,6 +215,8 @@ export class ObservableOplog {
     const self = this;
     
     return this.getTime().then(function (t) {
+      
+      console.log('timestamp:', t);
       
       query.ts = {$gt: t};
       
