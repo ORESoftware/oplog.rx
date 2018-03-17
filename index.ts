@@ -31,6 +31,7 @@ export type OplogNamespace = string | object | RegExp;
 
 export interface OplogObservableOpts {
   query: object,
+  q: object,
   ts?: ObservableOplogTimestamp,
   timestamp?: ObservableOplogTimestamp,
   uri?: string,
@@ -117,6 +118,7 @@ export class ObservableOplog {
       throw new Error('Cannot use both "namespace" and "ns" options - pick one.');
     }
     
+    this.query = opts.query || opts.q;
     this.ts = opts.ts || opts.timestamp;
     this.uri = opts.uri || MONGO_URI;
     this.ns = opts.ns || opts.namespace;
@@ -251,6 +253,10 @@ export class ObservableOplog {
       // });
       
       // const q2 = coll.find(query).addOption();
+      
+      if(self.query){
+        log.info('using a custom query:', JSON.stringify(self.query));
+      }
       
       const q = coll.find(self.query || query)
       .addCursorFlag('tailable', true)

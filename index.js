@@ -84,6 +84,7 @@ var ObservableOplog = (function () {
         if (opts.ns && opts.namespace) {
             throw new Error('Cannot use both "namespace" and "ns" options - pick one.');
         }
+        this.query = opts.query || opts.q;
         this.ts = opts.ts || opts.timestamp;
         this.uri = opts.uri || MONGO_URI;
         this.ns = opts.ns || opts.namespace;
@@ -182,6 +183,9 @@ var ObservableOplog = (function () {
         var self = this;
         return this.getTime().then(function (t) {
             query.ts = { $gt: t };
+            if (self.query) {
+                log.info('using a custom query:', JSON.stringify(self.query));
+            }
             var q = coll.find(self.query || query)
                 .addCursorFlag('tailable', true)
                 .addCursorFlag('awaitData', true)

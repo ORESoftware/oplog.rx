@@ -1,20 +1,20 @@
 
- # Oplog.Rx 
+   # Oplog.Rx 
  
  Tails the MongoDB Oplog for you.
  An improvement over existing libraries. 
  This has interfaces for Observables and Node.js streams + better TypeScript typings.
  
- ### Installation => `npm install oplog.rx -S`
+### Installation => `npm install oplog.rx -S`
  
- ### Main features
+### Main features
  
  Has interfaces for both Node.js streams and RxJS Observables.
  This library will switch to native Observables once they become available.
  Until then, simply using the latest version of RxJS.
  
  
- ### How the Oplog works
+### How the Oplog works
  
  The MongoDB oplog is simply a capped collection that is tailable, using Cursor.stream();
  The structure of an Oplog document is like so:
@@ -22,6 +22,8 @@
  ```json
  {"ts":"6533791416483577857","t":4,"h":"8859258976700926266","v":2,"op":"i","ns":"test.foo","o":{"_id":"5ab94bb","username":"fox"}}
 ```
+
+### Here is a handy table talking about the fields in an oplog doc:
 
 | field | mr. arrow | description                                                                                       |
 |-------|-----------|---------------------------------------------------------------------------------------------------|
@@ -91,14 +93,12 @@ const oplog = new ObservableOplog({
   }
 });
 
-// if the query parameter is provided, it will be sent directly to:
+// if the query parameter is provided, it will be used directly to search the oplog.rs collection:
 
 const coll = db.collection('oplog.rs');
 const cursor = coll.find(query);
 
-
 ```
-
 
 
 ###  Usage with Observables
