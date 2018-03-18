@@ -16,8 +16,8 @@ export declare type ObservableOplogTimestamp = {
 } | Timestamp;
 export declare type OplogNamespace = string | object | RegExp;
 export interface OplogObservableOpts {
-    query: object;
-    q: object;
+    query?: object;
+    q?: object;
     ts?: ObservableOplogTimestamp;
     timestamp?: ObservableOplogTimestamp;
     uri?: string;
