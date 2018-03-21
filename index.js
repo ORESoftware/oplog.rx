@@ -186,14 +186,13 @@ var ObservableOplog = (function () {
             if (self.query) {
                 log.info('using a custom query:', JSON.stringify(self.query));
             }
-            var q = coll.find(self.query || query)
+            var q = self.rawCursor = coll.find(self.query || query)
                 .addCursorFlag('tailable', true)
                 .addCursorFlag('awaitData', true)
                 .addCursorFlag('noCursorTimeout', true)
                 .addCursorFlag('oplogReplay', true)
                 .setCursorOption('numberOfRetries', Number.MAX_VALUE)
                 .setCursorOption('tailableRetryInterval', 200);
-            self.rawCursor = q;
             return self.rawStream = q.stream();
         });
     };

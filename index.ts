@@ -254,11 +254,11 @@ export class ObservableOplog {
       
       // const q2 = coll.find(query).addOption();
       
-      if(self.query){
+      if (self.query) {
         log.info('using a custom query:', JSON.stringify(self.query));
       }
       
-      const q = coll.find(self.query || query)
+      const q = self.rawCursor = coll.find(self.query || query)
       .addCursorFlag('tailable', true)
       .addCursorFlag('awaitData', true)  // true or false?
       .addCursorFlag('noCursorTimeout', true)
@@ -266,7 +266,6 @@ export class ObservableOplog {
       .setCursorOption('numberOfRetries', Number.MAX_VALUE)
       .setCursorOption('tailableRetryInterval', 200);
       
-      self.rawCursor = q;
       return self.rawStream = q.stream();
     });
     
