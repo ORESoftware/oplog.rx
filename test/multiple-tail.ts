@@ -29,20 +29,20 @@ oplog.tail().then(function () {
 
 
 
-const ev = oplog.getOps();
+const ops = oplog.getOps();
 
-ev.delete.filter(v => {
+ops.delete.filter(v => {
   return true;
 })
 .subscribe(v => {
   // console.log('delete happened.')
 });
 
-ev.insert.subscribe(v => {
+ops.insert.subscribe(v => {
   // console.log('insert happened.')
 });
 
-ev.update.subscribe(v => {
+ops.update.subscribe(v => {
   // console.log('update happened.')
 });
 

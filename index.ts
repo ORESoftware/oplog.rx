@@ -8,44 +8,22 @@ import {Timestamp} from "bson";
 import EventEmitter = require('events');
 const MONGO_URI = 'mongodb://127.0.0.1:27017/local';
 import helpers = require('./lib/helper');
-import {OplogInterpreter, OplogInterpreterOpts, ReadableStrmWithFilter, SubjectMap} from "./lib/interfaces";
+
+import {
+  OplogInterpreter,
+  OplogInterpreterOpts,
+  ReadableStrmWithFilter,
+  SubjectMap,
+  OplogQuery,
+  OplogStrmFilter, OplogObservableOpts, ObservableOplogTimestamp, OplogNamespace, OplogDoc
+} from "./lib/interfaces";
 
 const log = {
   info: console.log.bind(console, '[oplog.rx]'),
   error: console.error.bind(console, '[oplog.rx]'),
 };
 
-interface OplogQuery {
-  ns?: any,
-  ts?: any,
-  $and: Array<any>
-}
 
-export type ObservableOplogTimestamp =
-  { $timestamp: string } |
-  { _bsontype: 'Timestamp', low_: number, high_: number } |
-  { low: number, high: number } |
-  Timestamp;
-
-export type OplogNamespace = string | object | RegExp;
-
-export interface OplogObservableOpts {
-  query?: object,
-  q?: object,
-  ts?: ObservableOplogTimestamp,
-  timestamp?: ObservableOplogTimestamp,
-  uri?: string,
-  url?: string,
-  collName?: string;
-  ns?: OplogNamespace;
-  namespace?: string;
-}
-
-export interface OplogStrmFilter {
-  events?: Array<'update' | 'insert' | 'delete'>
-  namespace?: string,
-  ns?: string
-}
 
 export {getOplogStreamInterpreter} from './lib/helper';
 export {getOplogStreamInterpreter as oplogStreamInterpreter} from './lib/helper';
@@ -173,10 +151,15 @@ export class ObservableOplog {
     });
   };
   
-  private handleOplogData(v: Object) {
+  private handleOplogData(v: OplogDoc) {
     
     if (!v) {
       log.error('Unexpected error: empty changeStream event data [1].');
+      return;
+    }
+  
+    if (!v.op) {
+      log.error('Unexpected error: "op" field was not defined on data object. [1].');
       return;
     }
     
@@ -198,6 +181,7 @@ export class ObservableOplog {
     });
     
     if (!type) {
+      log.error('"op" filed does not appear to be in [i,u,d]')
       this.ops.all.next({type: 'unknown', value: v});
       return;
     }
@@ -207,7 +191,6 @@ export class ObservableOplog {
   }
   
   private async getTime(): Promise<Timestamp> {
-    
     const ts = this.ts as any;
     const coll = this.coll;
     return helpers.getValidTimestamp(ts, coll);
@@ -348,7 +331,7 @@ export class ObservableOplog {
         self.handleOplogEnd(v);
       });
       
-      s.on('data', function (v: any) {
+      s.on('data', function (v: OplogDoc) {
         self.handleOplogData(v);
       });
       
@@ -397,6 +380,6 @@ export class ObservableOplog {
   
 }
 
-export const create = function (opts: OplogObservableOpts, mongoOpts: any) {
+export const create = function (opts?: OplogObservableOpts, mongoOpts?: any) {
   return new ObservableOplog(opts, mongoOpts);
 };

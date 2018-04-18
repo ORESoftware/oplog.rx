@@ -70,7 +70,8 @@ var ObservableOplog = (function () {
             insert: new rxjs_1.Subject(),
             delete: new rxjs_1.Subject(),
             errors: new rxjs_1.Subject(),
-            end: new rxjs_1.Subject()
+            end: new rxjs_1.Subject(),
+            del: null
         };
         this.transformStreams = [];
         this.readableStreams = [];
@@ -84,6 +85,7 @@ var ObservableOplog = (function () {
         if (opts.ns && opts.namespace) {
             throw new Error('Cannot use both "namespace" and "ns" options - pick one.');
         }
+        this.ops.del = this.ops.delete;
         this.query = opts.query || opts.q;
         this.ts = opts.ts || opts.timestamp;
         this.uri = opts.uri || MONGO_URI;
@@ -130,6 +132,10 @@ var ObservableOplog = (function () {
             log.error('Unexpected error: empty changeStream event data [1].');
             return;
         }
+        if (!v.op) {
+            log.error('Unexpected error: "op" field was not defined on data object. [1].');
+            return;
+        }
         var type = exports.evs[v.op];
         this.transformStreams.forEach(function (t) {
             t.write(v);
@@ -143,6 +149,7 @@ var ObservableOplog = (function () {
             }
         });
         if (!type) {
+            log.error('"op" filed does not appear to be in [i,u,d]');
             this.ops.all.next({ type: 'unknown', value: v });
             return;
         }

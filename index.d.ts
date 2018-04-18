@@ -1,36 +1,8 @@
 /// <reference types="node" />
 import { Readable, Transform } from "stream";
 import { ChangeStream } from 'mongodb';
-import { Subject } from "rxjs";
-import { Timestamp } from "bson";
 import EventEmitter = require('events');
-export declare type ObservableOplogTimestamp = {
-    $timestamp: string;
-} | {
-    _bsontype: 'Timestamp';
-    low_: number;
-    high_: number;
-} | {
-    low: number;
-    high: number;
-} | Timestamp;
-export declare type OplogNamespace = string | object | RegExp;
-export interface OplogObservableOpts {
-    query?: object;
-    q?: object;
-    ts?: ObservableOplogTimestamp;
-    timestamp?: ObservableOplogTimestamp;
-    uri?: string;
-    url?: string;
-    collName?: string;
-    ns?: OplogNamespace;
-    namespace?: string;
-}
-export interface OplogStrmFilter {
-    events?: Array<'update' | 'insert' | 'delete'>;
-    namespace?: string;
-    ns?: string;
-}
+import { SubjectMap, OplogStrmFilter, OplogObservableOpts } from "./lib/interfaces";
 export { getOplogStreamInterpreter } from './lib/helper';
 export { getOplogStreamInterpreter as oplogStreamInterpreter } from './lib/helper';
 export declare const regex: (pattern: string) => RegExp;
@@ -59,14 +31,7 @@ export declare class ObservableOplog {
     private rawStream;
     private readableStreams;
     constructor(opts?: OplogObservableOpts, mongoOpts?: any);
-    getOps(): {
-        all: Subject<any>;
-        update: Subject<Object>;
-        insert: Subject<Object>;
-        delete: Subject<Object>;
-        errors: Subject<Object>;
-        end: Subject<Object>;
-    };
+    getOps(): SubjectMap;
     getEmitter(): EventEmitter;
     connect(): Promise<null>;
     private handleOplogError(e);
@@ -81,4 +46,4 @@ export declare class ObservableOplog {
     stop(isLog?: boolean): Promise<any>;
     close(): Promise<any>;
 }
-export declare const create: (opts: OplogObservableOpts, mongoOpts: any) => ObservableOplog;
+export declare const create: (opts?: OplogObservableOpts, mongoOpts?: any) => ObservableOplog;

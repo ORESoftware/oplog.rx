@@ -1,20 +1,18 @@
 
-   # Oplog.Rx 
+  # Oplog.Rx 
  
- Tails the MongoDB Oplog for you.
- An improvement over existing libraries. 
- This has interfaces for Observables and Node.js streams + better TypeScript typings.
+Tails the MongoDB Oplog for you. An improvement over existing libraries. 
  
-### Installation => `npm install oplog.rx`
+## Installation => `npm install oplog.rx`
  
 ### Main features
  
- Has interfaces for both Node.js streams and RxJS Observables.
- This library will switch to native Observables once they become available.
- Until then, simply using the latest version of RxJS5.
+Has interfaces for both Node.js streams and RxJS Observables + better TypeScript typings
+This library will switch to native Observables once they become available.
+Until then, simply using the latest version of RxJS5.
  
  
-### How the Oplog works
+#### <i>How the Oplog works</i>
  
  The MongoDB oplog is simply a capped collection that is tailable, using Cursor.stream();
  The structure of an Oplog document is like so:
@@ -23,7 +21,7 @@
  {"ts":"6533791416483577857","t":4,"h":"8859258976700926266","v":2,"op":"i","ns":"test.foo","o":{"_id":"5ab94bb","username":"fox"}}
 ```
 
-### Here is a handy table talking about the fields in an oplog doc:
+#### Here is a handy table talking about the fields in an oplog doc:
 
 | field | description                                                                                       |
 |-------|---------------------------------------------------------------------------------------------------|
@@ -41,7 +39,7 @@
 https://engineering.tes.com/post/mongodb-oplog/
  
  
- ### Basic Usage
+ ## <i>Basic Usage</i>
  
  ```js
 import {ObservableOplog} from 'oplog.rx';
@@ -66,7 +64,7 @@ oplog.getEmitter()
 
 ```
 
-### Useful Query/Filter options
+## <i>Useful Query/Filter options</i>
 
 ```js
 import {ObservableOplog} from 'oplog.rx';
@@ -101,7 +99,7 @@ const cursor = coll.find(query);
 ```
 
 
-###  Usage with RxJS Observables
+##  <i>Usage with RxJS Observables</i>
 
 ```js
  const oplog = new ObservableOplog();
@@ -130,7 +128,7 @@ const cursor = coll.find(query);
 ```
 
 
-### Usage with Node.js Streams
+## <i>Usage with Node.js Streams</i>
 
 ```js
  const oplog = new ObservableOplog();
