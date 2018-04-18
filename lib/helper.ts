@@ -62,10 +62,11 @@ export const getValidTimestamp = function (ts: any, coll: Collection) : Timestam
 
 export const getOplogStreamInterpreter = function (s: Stream, opts?: OplogInterpreterOpts): OplogInterpreter {
   
+  // we can use options to optimize so that we only use either emitter or observers
   opts = opts || {useEmitter: true, useObservers: true};
   
-  const ret = {
-    ops: opts.useObservers && {
+  const ret = <OplogInterpreter>{
+    ops:  {
       all: new Subject<any>(),
       update: new Subject<Object>(),
       insert: new Subject<Object>(),
@@ -73,8 +74,11 @@ export const getOplogStreamInterpreter = function (s: Stream, opts?: OplogInterp
       errors: new Subject<Object>(),
       end: new Subject<Object>(),
     },
-    emitter: opts.useEmitter && new EventEmitter()
+    emitter: new EventEmitter()
   };
+  
+  //create alias
+  ret.ops.del = ret.ops.delete;
   
   s.on('error', function (e) {
     ret.emitter.emit('error', e);

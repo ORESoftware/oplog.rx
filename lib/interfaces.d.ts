@@ -14,13 +14,17 @@ export interface OplogInterpreterOpts {
 }
 
 export interface OplogInterpreter {
-  ops?: {
-    all: Subject<any>,
-    update: Subject<Object>,
-    insert: Subject<Object>,
-    delete: Subject<Object>,
-    errors: Subject<Object>,
-    end: Subject<Object>
-  },
-  emitter?: EventEmitter
+  ops: SubjectMap,
+  emitter: EventEmitter
+}
+
+export type SubjectMap = {
+  [key: string]: Subject<Object>,
+  all: Subject<any>,
+  update: Subject<Object>,
+  insert: Subject<Object>,
+  delete: Subject<Object>,
+  errors: Subject<Object>,
+  end: Subject<Object>,
+  del: Subject<Object>
 }

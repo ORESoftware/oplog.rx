@@ -8,7 +8,7 @@ import {Timestamp} from "bson";
 import EventEmitter = require('events');
 const MONGO_URI = 'mongodb://127.0.0.1:27017/local';
 import helpers = require('./lib/helper');
-import {OplogInterpreter, OplogInterpreterOpts, ReadableStrmWithFilter} from "./lib/interfaces";
+import {OplogInterpreter, OplogInterpreterOpts, ReadableStrmWithFilter, SubjectMap} from "./lib/interfaces";
 
 const log = {
   info: console.log.bind(console, '[oplog.rx]'),
@@ -74,6 +74,7 @@ export const evs = <EventsSignature>{
   d: 'delete'
 };
 
+
 export type ErrorFirstCB = (err?: Error) => void;
 
 export class ObservableOplog {
@@ -88,13 +89,14 @@ export class ObservableOplog {
   private ns: OplogNamespace;
   private query: any;
   
-  private ops = {
+  private ops = <SubjectMap>{
     all: new Subject<any>(),
     update: new Subject<Object>(),
     insert: new Subject<Object>(),
     delete: new Subject<Object>(),
     errors: new Subject<Object>(),
-    end: new Subject<Object>()
+    end: new Subject<Object>(),
+    del: null as Subject<Object>
   };
   
   private rawCursor: Cursor;
@@ -118,6 +120,7 @@ export class ObservableOplog {
       throw new Error('Cannot use both "namespace" and "ns" options - pick one.');
     }
     
+    this.ops.del = this.ops.delete;  // create alias
     this.query = opts.query || opts.q;
     this.ts = opts.ts || opts.timestamp;
     this.uri = opts.uri || MONGO_URI;

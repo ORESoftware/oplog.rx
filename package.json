@@ -24,7 +24,7 @@
   "homepage": "https://github.com/ORESoftware/oplog.rx#readme",
   "dependencies": {
     "bson": "^2.0.4",
-    "json-stdio": "0.0.1015",
+    "json-stdio": "0.0.1016",
     "mongodb": "^3.0.4",
     "rxjs": "^5.5.7"
   },

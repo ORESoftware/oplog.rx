@@ -5,13 +5,13 @@
  An improvement over existing libraries. 
  This has interfaces for Observables and Node.js streams + better TypeScript typings.
  
-### Installation => `npm install oplog.rx -S`
+### Installation => `npm install oplog.rx`
  
 ### Main features
  
  Has interfaces for both Node.js streams and RxJS Observables.
  This library will switch to native Observables once they become available.
- Until then, simply using the latest version of RxJS.
+ Until then, simply using the latest version of RxJS5.
  
  
 ### How the Oplog works
@@ -25,19 +25,19 @@
 
 ### Here is a handy table talking about the fields in an oplog doc:
 
-| field | mr. arrow | description                                                                                       |
-|-------|-----------|---------------------------------------------------------------------------------------------------|
-| ts    | =>        | 64bit timestamp                                                                                   |
-| op    | =>        | the type of operation (i is insert, u is update, d is delete, etc.)                               |
-| ns    | =>        | \<db\>.\<collection\>                                                                                 |
-| o     | =>        | the document that changed (it should always be the complete document, not just the changed part). |
-| t     | =>        | the election "term" of the replicaset (not really important)                                      |
-| v     | =>        | Version of the oplog format (unfortunately not the version of the document object)                |
-| h     | =>        | The hash field gives each oplog entry a unique id                                                 |
+| field | description                                                                                       |
+|-------|---------------------------------------------------------------------------------------------------|
+| ts    | 64bit timestamp                                                                                   |
+| op    | the type of operation (i is insert, u is update, d is delete, etc.)                               |
+| ns    | \<db\>.\<collection\>                                                                             |
+| o     | the document that changed (it should always be the complete document, not just the changed part). |
+| t     | the election "term" of the replicaset (not really important)                                      |
+| v     | Version of the oplog format (unfortunately not the version of the document object)                |
+| h     | The hash field gives each oplog entry a unique id                                                 |
 
 
 
-This article is pretty good on the subject:
+<b>This article is pretty good on the subject:</b><br>
 https://engineering.tes.com/post/mongodb-oplog/
  
  
@@ -79,7 +79,7 @@ const oplog = new ObservableOplog({
   }
 });
 
-// or if you need something very custom use query:
+// or if you need something very custom, use query:
 
 const oplog = new ObservableOplog({
   query: {
@@ -94,16 +94,14 @@ const oplog = new ObservableOplog({
 });
 
 // if the query parameter is provided, it will be used directly to search the oplog.rs collection:
-
+// like so:
 const coll = db.collection('oplog.rs');
 const cursor = coll.find(query);
 
 ```
 
 
-###  Usage with Observables
-
-Oplog.Rx is designed to support Observables and Node.js streams 
+###  Usage with RxJS Observables
 
 ```js
  const oplog = new ObservableOplog();
@@ -125,13 +123,14 @@ Oplog.Rx is designed to support Observables and Node.js streams
  ops.update.subscribe(v => {
    
  });
+ 
+ // or use:
+ const {insert, update, del} = oplog.getOps();
 
 ```
 
 
 ### Usage with Node.js Streams
-
-Oplog.Rx is designed to support Observables and Node.js streams 
 
 ```js
  const oplog = new ObservableOplog();
