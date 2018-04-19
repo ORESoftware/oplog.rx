@@ -15,21 +15,18 @@ oplog.tail().then(function () {
         oplog.getFilteredStream({}).pipe(json_stdio_1.transformObject2JSON()).on('data', function (v) {
             console.log('all done and well?:', count++);
         });
-    })
-        .catch(function (err) {
-        console.error(err);
     });
 })
     .catch(function (err) {
     console.error(err);
 });
-var ev = oplog.getOps();
-ev.delete.filter(function (v) {
+var ops = oplog.getOps();
+ops.delete.filter(function (v) {
     return true;
 })
     .subscribe(function (v) {
 });
-ev.insert.subscribe(function (v) {
+ops.insert.subscribe(function (v) {
 });
-ev.update.subscribe(function (v) {
+ops.update.subscribe(function (v) {
 });

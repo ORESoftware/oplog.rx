@@ -17,15 +17,15 @@ oplog.tail().then(function () {
     .catch(function (err) {
     console.error(err);
 });
-var evs = oplog.getOps();
-evs.delete.filter(function (v) {
+var ops = oplog.getOps();
+ops.delete.filter(function (v) {
     return true;
 })
     .subscribe(function (v) {
 });
-evs.insert.subscribe(function (v) {
+ops.insert.subscribe(function (v) {
 });
-evs.update.subscribe(function (v) {
+ops.update.subscribe(function (v) {
 });
 var count = 0;
 oplog.getFilteredStream({}).pipe(json_stdio_1.transformObject2JSON()).on('data', function (v) {

@@ -17,10 +17,6 @@ oplog.tail().then(function () {
     oplog.getFilteredStream({}).pipe(transformObject2JSON()).on('data', function(v){
       console.log('all done and well?:', count++);
     });
-    
-  })
-  .catch(function (err) {
-    console.error(err);
   });
 })
 .catch(function (err) {

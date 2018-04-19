@@ -22,20 +22,20 @@ oplog.tail().then(function () {
   console.error(err);
 });
 
-const ev = oplog.getOps();
+const ops = oplog.getOps();
 
-ev.delete.filter(v => {
+ops.delete.filter(v => {
   return true;
 })
 .subscribe(v => {
   // console.log('delete happened.')
 });
 
-ev.insert.subscribe(v => {
+ops.insert.subscribe(v => {
   // console.log('insert happened.')
 });
 
-ev.update.subscribe(v => {
+ops.update.subscribe(v => {
   // console.log('update happened.')
 });
 
@@ -44,6 +44,7 @@ ev.update.subscribe(v => {
 // strm.on('data', function (d) {
 //   console.log(String(d));
 // });
+
 
 let count = 0;
 oplog.getFilteredStream({}).pipe(transformObject2JSON()).on('data', function (v) {
