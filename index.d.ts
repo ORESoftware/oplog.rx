@@ -3,6 +3,7 @@ import { Readable, Transform } from "stream";
 import { ChangeStream } from 'mongodb';
 import EventEmitter = require('events');
 import { SubjectMap, OplogStrmFilter, OplogObservableOpts } from "./lib/interfaces";
+export { OplogDoc } from './lib/interfaces';
 export { getOplogStreamInterpreter } from './lib/helper';
 export { getOplogStreamInterpreter as oplogStreamInterpreter } from './lib/helper';
 export declare const regex: (pattern: string) => RegExp;

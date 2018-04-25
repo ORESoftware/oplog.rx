@@ -18,6 +18,9 @@ import {
   OplogStrmFilter, OplogObservableOpts, ObservableOplogTimestamp, OplogNamespace, OplogDoc
 } from "./lib/interfaces";
 
+
+export {OplogDoc} from './lib/interfaces';
+
 const log = {
   info: console.log.bind(console, '[oplog.rx]'),
   error: console.error.bind(console, '[oplog.rx]'),
