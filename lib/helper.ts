@@ -2,7 +2,7 @@
 
 import {ObservableOplog, evs} from "../";
 import {OplogInterpreter, OplogInterpreterOpts} from "./interfaces";
-import {Subject} from "rxjs/Rx";
+import {Subject} from "rxjs";
 import {Stream} from "stream";
 import {EventEmitter} from "events";
 import {Timestamp} from "bson";
