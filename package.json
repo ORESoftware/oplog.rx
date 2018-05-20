@@ -1,8 +1,8 @@
 {
   "name": "oplog.rx",
-  "version": "0.0.105",
+  "version": "0.0.106",
   "description": "",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
     "test": "suman test"
   },
@@ -16,7 +16,7 @@
     "rx",
     "rxjs"
   ],
-  "author": "Olegzandr V.D.",
+  "author": "Olegzandr VD",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/ORESoftware/oplog.rx/issues"
@@ -24,7 +24,7 @@
   "homepage": "https://github.com/ORESoftware/oplog.rx#readme",
   "dependencies": {
     "bson": "^2.0.4",
-    "json-stdio": "0.0.1016",
+    "json-stdio": "latest",
     "mongodb": "^3.0.4",
     "rxjs": "^6.0.0",
     "rxjs-compat": "^6.0.0"
