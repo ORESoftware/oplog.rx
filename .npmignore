@@ -1,6 +1,13 @@
+
+### matching
 *.log
 *.md
+*.tgz
+
+### folders
 node_modules
 .idea
 .vscode
-.DS_Store
+test
+lib
+

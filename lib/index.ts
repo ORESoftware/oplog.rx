@@ -7,29 +7,21 @@ import {Subject} from "rxjs";
 import {Timestamp} from "bson";
 import EventEmitter = require('events');
 const MONGO_URI = 'mongodb://127.0.0.1:27017/local';
-import helpers = require('./lib/helper');
+import helpers = require('./helper');
+import {evs} from './utils';
 
 import {
-  OplogInterpreter,
-  OplogInterpreterOpts,
-  ReadableStrmWithFilter,
-  SubjectMap,
-  OplogQuery,
-  OplogStrmFilter, OplogObservableOpts, ObservableOplogTimestamp, OplogNamespace, OplogDoc
-} from "./lib/interfaces";
+  log,
+  ObservableOplogTimestamp,
+  OplogDoc, OplogNamespace,
+  OplogObservableOpts, OplogQuery,
+  OplogStrmFilter,
+  ReadableStrmWithFilter, SubjectMap
+} from './utils';
 
 
-export {OplogDoc} from './lib/interfaces';
-
-const log = {
-  info: console.log.bind(console, '[oplog.rx]'),
-  error: console.error.bind(console, '[oplog.rx]'),
-};
-
-
-
-export {getOplogStreamInterpreter} from './lib/helper';
-export {getOplogStreamInterpreter as oplogStreamInterpreter} from './lib/helper';
+export {getOplogStreamInterpreter} from './helper';
+export {getOplogStreamInterpreter as oplogStreamInterpreter} from './helper';
 
 // *Open A Change Stream*
 // You can only open a change stream against replica sets or sharded clusters.
@@ -42,18 +34,6 @@ export const regex = function (pattern: string) {
   return new RegExp(`^${pattern}$`, 'i')
 };
 
-export interface EventsSignature {
-  [key: string]: string,
-  i: 'insert',
-  u: 'update',
-  d: 'delete'
-}
-
-export const evs = <EventsSignature>{
-  i: 'insert',
-  u: 'update',
-  d: 'delete'
-};
 
 
 export type ErrorFirstCB = (err?: Error) => void;
@@ -160,7 +140,7 @@ export class ObservableOplog {
       log.error('Unexpected error: empty changeStream event data [1].');
       return;
     }
-  
+    
     if (!v.op) {
       log.error('Unexpected error: "op" field was not defined on data object. [1].');
       return;
@@ -386,3 +366,5 @@ export class ObservableOplog {
 export const create = function (opts?: OplogObservableOpts, mongoOpts?: any) {
   return new ObservableOplog(opts, mongoOpts);
 };
+
+

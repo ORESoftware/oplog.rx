@@ -2,7 +2,9 @@
   "name": "oplog.rx",
   "version": "0.0.106",
   "description": "",
-  "main": "lib/index.js",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "suman test"
   },

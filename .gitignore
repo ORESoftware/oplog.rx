@@ -3,3 +3,7 @@ node_modules
 .idea
 .vscode
 .DS_Store
+dist/*
+
+### negation
+!dist/README.md
