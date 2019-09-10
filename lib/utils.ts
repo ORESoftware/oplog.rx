@@ -6,8 +6,8 @@ import {Subject} from 'rxjs';
 import {EventEmitter} from 'events';
 
 export const log = {
-  info: console.log.bind(console, '[oplog.rx]'),
-  error: console.error.bind(console, '[oplog.rx]'),
+  info: console.log.bind(console, 'oplog.rx:'),
+  error: console.error.bind(console, 'oplog.rx:'),
 };
 
 export interface EventsSignature {

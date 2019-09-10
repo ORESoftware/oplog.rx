@@ -102,7 +102,7 @@ export class ObservableOplog {
     
     debugger;
     
-    if (this.client && this.client.isConnected('xxx')) {
+    if (this.client && this.client.isConnected()) {
       log.info('MongoClient was already connected.');
       return Promise.resolve(null);
     }
@@ -164,7 +164,7 @@ export class ObservableOplog {
     });
     
     if (!type) {
-      log.error('"op" filed does not appear to be in [i,u,d]')
+      log.error('"op" filed does not appear to be in [i,u,d]');
       this.ops.all.next({type: 'unknown', value: v});
       return;
     }
@@ -232,8 +232,8 @@ export class ObservableOplog {
       .addCursorFlag('awaitData', true)  // true or false?
       .addCursorFlag('noCursorTimeout', true)
       .addCursorFlag('oplogReplay', true)
-      .setCursorOption('numberOfRetries', Number.MAX_VALUE)
-      .setCursorOption('tailableRetryInterval', 200);
+      .setCursorOption('numberOfRetries', Number.MAX_SAFE_INTEGER as any)
+      .setCursorOption('tailableRetryInterval', 200 as any);
       
       return self.rawStream = q.stream();
     });
