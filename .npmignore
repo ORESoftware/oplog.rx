@@ -1,10 +1,12 @@
 
 ### matching
+
 *.log
 *.md
 *.tgz
 
 ### folders
+
 node_modules
 .idea
 .vscode
