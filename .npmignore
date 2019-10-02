@@ -4,6 +4,8 @@
 *.log
 *.md
 *.tgz
+*.json
+
 
 ### folders
 
