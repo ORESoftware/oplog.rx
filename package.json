@@ -1,6 +1,6 @@
 {
   "name": "oplog.rx",
-  "version": "0.0.107",
+  "version": "0.0.108",
   "description": "",
   "main": "dist/main.js",
   "typings": "dist/main.d.ts",
@@ -27,7 +27,7 @@
   "homepage": "https://github.com/ORESoftware/oplog.rx#readme",
   "dependencies": {
     "bson": "^2.0.4",
-    "json-stdio": "0.1.109",
+    "json-stdio": "0.1.111",
     "mongodb": "^3.0.4",
     "rxjs": "^6.0.0",
     "rxjs-compat": "^6.0.0"
